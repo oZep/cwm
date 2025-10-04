@@ -8,6 +8,9 @@ import QuestionBox from "./QuestionBox";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+import { MonacoBinding } from "y-monaco";
 
 const CodeEditor = () => {
   const editorRef = useRef<{ getValue: () => string } | null>(null);
@@ -19,6 +22,24 @@ const CodeEditor = () => {
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
     setValue(CODE_SNIPPETS[language]);
+  };
+
+  const ydocument = new Y.Doc();
+  const provider = new WebsocketProvider(
+    `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`,
+    "monaco",
+    ydocument
+  );
+  const type = ydocument.getText("monaco");
+  const onMount = (editor: any) => {
+    editorRef.current = editor;
+    editor.focus();
+    const monacoBinding = new MonacoBinding(
+      type,
+      editor.getModel(),
+      new Set([editor]),
+      provider.awareness
+    );
   };
 
   const ydocument = new Y.Doc();
