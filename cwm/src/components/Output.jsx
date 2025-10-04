@@ -31,15 +31,14 @@ const Output = ({ editorRef, language }) => {
 
   return (
     <Box w="50%">
-      <Text mb={2} fontSize="lg">
-        Output
-      </Text>
       <Button
         variant="outline"
         colorScheme="green"
         mb={4}
         isLoading={isLoading}
         onClick={runCode}
+        background={"green.900"}
+        _hover={{ background: "green.600" }}
       >
         Run Code
       </Button>
@@ -50,6 +49,7 @@ const Output = ({ editorRef, language }) => {
         border="1px solid"
         borderRadius={4}
         borderColor={isError ? "red.500" : "#333"}
+        background={"#030003ff"}
       >
         {output
           ? output.map((line, i) => <Text key={i}>{line}</Text>)
