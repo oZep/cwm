@@ -8,11 +8,13 @@ import QuestionBox from "./QuestionBox";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
+import { RealTimeMonaco } from "./RealTimeMonaco";
 
 const CodeEditor = () => {
   const editorRef = useRef<{ getValue: () => string } | null>(null);
   const [value, setValue] = useState("");
-  const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [language, setLanguage] =
+    useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Removed duplicate onMount declaration
 
@@ -31,12 +33,12 @@ const CodeEditor = () => {
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
-    const monacoBinding = new MonacoBinding(
-      type,
-      editor.getModel(),
-      new Set([editor]),
-      provider.awareness
-    );
+    // const monacoBinding = new MonacoBinding(
+    //   type,
+    //   editor.getModel(),
+    //   new Set([editor]),
+    //   provider.awareness
+    // );
   };
 
   return (
@@ -52,19 +54,12 @@ const CodeEditor = () => {
             borderRadius={4}
             background={"blue.900"}
           >
-            <Editor
-              options={{
-                minimap: {
-                  enabled: false,
-                },
-              }}
-              height="75vh"
-              theme="vs-dark"
-              language={language}
-              defaultValue={CODE_SNIPPETS[language]}
-              onMount={onMount}
-              value={value}
-              onChange={(value) => setValue(value ?? "")}
+            <RealTimeMonaco
+              height="100vh"
+              width="100vw"
+              name="YourName"
+              roomId="unique-room-id"
+              color="#ff0000"
             />
           </Box>
         </Box>
