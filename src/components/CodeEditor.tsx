@@ -5,6 +5,9 @@ import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
 import Output from "./Output";
 import QuestionBox from "./QuestionBox";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+import { MonacoBinding } from "y-monaco";
 
 const CodeEditor = () => {
   const editorRef = useRef<{ getValue: () => string } | null>(null);
@@ -14,6 +17,12 @@ const CodeEditor = () => {
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
+    // const monacoBinding = new MonacoBinding(
+    //   type,
+    //   editor.getModel(),
+    //   new Set([editor]),
+    //   provider.awareness
+    // );
   };
 
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
@@ -21,27 +30,41 @@ const CodeEditor = () => {
     setValue(CODE_SNIPPETS[language]);
   };
 
+  const ydocument = new Y.Doc();
+  const provider = new WebsocketProvider(
+    `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`,
+    "monaco",
+    ydocument
+  );
+  const type = ydocument.getText("monaco");
+
   return (
     <Box background={"purple.800"} minHeight="100vh" py={4}>
-      <QuestionBox question={"What is the capital of France?"}/> {/* This will be supplimented by an api call */}
+      <QuestionBox question={"What is the capital of France?"} />{" "}
+      {/* This will be supplimented by an api call */}
       <HStack spacing={4} mx={10} my={1}>
         <Box w="50%">
           <LanguageSelector language={language} onSelect={onSelect} />
-          <Box borderColor={"pink.100"} borderWidth={1} borderRadius={4} background={"blue.900"}>
-          <Editor
-            options={{
-              minimap: {
-                enabled: false,
-              },
-            }}
-            height="75vh"
-            theme="vs-dark"
-            language={language}
-            defaultValue={CODE_SNIPPETS[language]}
-            onMount={onMount}
-            value={value}
-            onChange={(value) => setValue(value ?? "")}
-          />
+          <Box
+            borderColor={"pink.100"}
+            borderWidth={1}
+            borderRadius={4}
+            background={"blue.900"}
+          >
+            <Editor
+              options={{
+                minimap: {
+                  enabled: false,
+                },
+              }}
+              height="75vh"
+              theme="vs-dark"
+              language={language}
+              defaultValue={CODE_SNIPPETS[language]}
+              onMount={onMount}
+              value={value}
+              onChange={(value) => setValue(value)}
+            />
           </Box>
         </Box>
         <Output editorRef={editorRef} language={language} />
