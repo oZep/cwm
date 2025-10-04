@@ -14,17 +14,6 @@ const CodeEditor = () => {
   const [value, setValue] = useState("");
   const [language, setLanguage] = useState("javascript");
 
-  const onMount = (editor: any) => {
-    editorRef.current = editor;
-    editor.focus();
-    // const monacoBinding = new MonacoBinding(
-    //   type,
-    //   editor.getModel(),
-    //   new Set([editor]),
-    //   provider.awareness
-    // );
-  };
-
   const onSelect = (language) => {
     setLanguage(language);
     setValue(CODE_SNIPPETS[language]);
@@ -37,6 +26,19 @@ const CodeEditor = () => {
     ydocument
   );
   const type = ydocument.getText("monaco");
+  const onMount = (editor: any) => {
+    editorRef.current = editor;
+    editor.focus();
+    // console.log(type);
+    // console.log(editor.getModel());
+    // console.log(provider.awareness);
+    const monacoBinding = new MonacoBinding(
+      type,
+      editor.current.getModel(),
+      new Set([editor.current]),
+      provider.awareness
+    );
+  };
 
   return (
     <Box background={"purple.800"} minHeight="100vh" py={4}>
