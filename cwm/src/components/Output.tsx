@@ -2,14 +2,19 @@ import { useState } from "react";
 import { Box, Button, Text, useToast } from "@chakra-ui/react";
 import { executeCode } from "../api";
 
-const Output = ({ editorRef, language }) => {
+interface OutputProps {
+  editorRef: React.RefObject<{ getValue: () => string }>;
+  language: string;
+}
+
+const Output = ({ editorRef, language }: OutputProps) => {
   const toast = useToast();
-  const [output, setOutput] = useState(null);
+  const [output, setOutput] = useState<string[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
 
   const runCode = async () => {
-    const sourceCode = editorRef.current.getValue();
+    const sourceCode = editorRef.current?.getValue();
     if (!sourceCode) return;
     try {
       setIsLoading(true);
@@ -20,7 +25,10 @@ const Output = ({ editorRef, language }) => {
       console.log(error);
       toast({
         title: "An error occurred.",
-        description: error.message || "Unable to run code",
+        description:
+          typeof error === "object" && error !== null && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Unable to run code",
         status: "error",
         duration: 6000,
       });

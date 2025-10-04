@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/CodeEditor.jsx", "src/components/Output.jsx", "src/components/LanguageSelector.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/CodeEditor.tsx", "src/components/Output.tsx", "src/components/LanguageSelector.tsx"],
   "exclude": ["node_modules"]
 }
