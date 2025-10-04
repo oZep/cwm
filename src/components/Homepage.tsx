@@ -1,14 +1,17 @@
 'use client'
 
 import {
-  Flex,
   Container,
   Heading,
   Stack,
   Text,
   Button,
   Box,
-  Image
+  Image,
+  SimpleGrid,
+  Card,
+  CardBody,
+  Avatar,
 } from '@chakra-ui/react'
 
 import { Illustration } from './Illustration'
@@ -25,8 +28,7 @@ export default function CallToActionWithIllustration() {
         <Heading
           fontWeight={600}
           fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
-          lineHeight={'110%'}>
-          Code With Me{' '}
+          lineHeight={'110%'}>Code With Me{' '}
           <Text as={'span'} color={'pink.400'}>
             made easy
           </Text>
@@ -48,14 +50,59 @@ export default function CallToActionWithIllustration() {
         </Stack>
           <Image src="/girl.png" alt="Illustration" />
       </Stack>
-      <Heading
+
+      <Box py={16}>
+        <Heading
         fontWeight={600}
         fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
         lineHeight={'110%'}
+        textAlign={'center'}
+        mb={12}
       >
-        Mission Statement
+          Our Mission
       </Heading>
-      <p></p>
+        <Text color={'white'} maxW={'3xl'} mx={'auto'} textAlign={'center'} mb={16}>
+          Using the one-on-one community experience to encourage others to learn how to code
+        </Text>
+
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8} mt={12}>
+          <Card bg={'purple.800'} borderRadius={'lg'} p={6}>
+            <CardBody display="flex" flexDirection="column" justifyContent="space-between" height="100%">
+              <Text color={'white'} mb={4} fontStyle="italic">
+                "This experience made me feel confident about my coding experience"
+              </Text>
+              <Stack direction={'row'} alignItems={'center'}>
+                <Avatar src="/user1.jpg" name="Alex Johnson" />
+                <Text color={'white'} fontWeight={500}>Alex Johnson</Text>
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card bg={'purple.800'} borderRadius={'lg'} p={6}>
+            <CardBody display="flex" flexDirection="column" justifyContent="space-between" height="100%">
+              <Text color={'white'} mb={4} fontStyle="italic">
+                "The mentorship program helped me land my first developer job"
+              </Text>
+              <Stack direction={'row'} alignItems={'center'}>
+                <Avatar src="/user2.jpg" name="Maria Garcia" />
+                <Text color={'white'} fontWeight={500}>Maria Garcia</Text>
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card bg={'purple.800'} borderRadius={'lg'} p={6} height="100%">
+            <CardBody display="flex" flexDirection="column" justifyContent="space-between" height="100%">
+              <Text color={'white'} mb={4} fontStyle="italic">
+                "I went from zero to building full applications in 6 months"
+              </Text>
+              <Stack direction={'row'} alignItems={'center'}>
+                <Avatar src="/user3.jpg" name="Sam Chen" />
+                <Text color={'white'} fontWeight={500}>Sam Chen</Text>
+              </Stack>
+            </CardBody>
+          </Card>
+        </SimpleGrid>
+    </Box>
     </Container>
     </Box>
   )
