@@ -39,17 +39,31 @@ const Output = ({ editorRef, language }: OutputProps) => {
 
   return (
     <Box w="50%">
-      <Button
-        variant="outline"
-        colorScheme="green"
-        mb={4}
-        isLoading={isLoading}
-        onClick={runCode}
-        background={"green.900"}
-        _hover={{ background: "green.600" }}
-      >
-        Run Code
-      </Button>
+      <Box display="flex" justifyContent="space-between" mb={4}>
+        <Button
+          variant="outline"
+          colorScheme="green"
+          isLoading={isLoading}
+          onClick={runCode}
+          background={"green.900"}
+          _hover={{ background: "green.600" }}
+        >
+          Run Code
+        </Button>
+        <Button
+          variant="outline"
+          colorScheme="grey"
+          as={'a'}
+          href="/"
+          color={"gray.300"}
+          background={"gray.900"}
+          _hover={{ background: "gray.600" }}
+          border={"1px solid"}
+          borderColor={"gray.400"}
+        >
+          Exit
+        </Button>
+      </Box>
       <Box
         height="75vh"
         p={2}
