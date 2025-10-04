@@ -11,7 +11,7 @@ const CodeEditor = () => {
   const [value, setValue] = useState("");
   const [language, setLanguage] = useState("javascript");
 
-  const onMount = (editor) => {
+  const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
   };
@@ -22,11 +22,12 @@ const CodeEditor = () => {
   };
 
   return (
-    <Box background={"purple.900"} minHeight="100vh" py={4}>
+    <Box background={"purple.800"} minHeight="100vh" py={4}>
       <QuestionBox question={"What is the capital of France?"}/> {/* This will be supplimented by an api call */}
       <HStack spacing={4} mx={10} my={1}>
         <Box w="50%">
           <LanguageSelector language={language} onSelect={onSelect} />
+          <Box borderColor={"pink.100"} borderWidth={1} borderRadius={4} background={"blue.900"}>
           <Editor
             options={{
               minimap: {
@@ -41,6 +42,7 @@ const CodeEditor = () => {
             value={value}
             onChange={(value) => setValue(value)}
           />
+          </Box>
         </Box>
         <Output editorRef={editorRef} language={language} />
       </HStack>
