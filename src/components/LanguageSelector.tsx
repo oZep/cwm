@@ -7,12 +7,17 @@ import {
   MenuList,
   Text,
 } from "@chakra-ui/react";
-import { LANGUAGE_VERSIONS } from "../constants";
+import { CODE_SNIPPETS, LANGUAGE_VERSIONS } from "../constants";
 
 const languages = Object.entries(LANGUAGE_VERSIONS);
 const ACTIVE_COLOR = "purple.200";
 
-const LanguageSelector = ({ language, onSelect }) => {
+interface LanguageSelectorProps {
+  language: keyof typeof CODE_SNIPPETS;
+  onSelect: (language: keyof typeof CODE_SNIPPETS) => void;
+}
+
+const LanguageSelector = ({ language, onSelect }: LanguageSelectorProps) => {
   return (
     <Box mb={4}>
       <Menu isLazy>
@@ -27,7 +32,7 @@ const LanguageSelector = ({ language, onSelect }) => {
                 color: ACTIVE_COLOR,
                 bg: "pink.900",
               }}
-              onClick={() => onSelect(lang)}
+              onClick={() => onSelect(lang as keyof typeof CODE_SNIPPETS)}
             >
               {lang}
               &nbsp;

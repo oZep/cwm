@@ -1,5 +1,9 @@
-import { Box, Button, Text } from "@chakra-ui/react";
-const QuestionBox = ({ question }) => {
+import { Box, Text } from "@chakra-ui/react";
+interface QuestionBoxProps {
+    question: string;
+}
+
+const QuestionBox = ({ question }: QuestionBoxProps) => {
     return (
         <div>
         <Box p={4} borderWidth={1} borderRadius="md" bg="blackAlpha.300" borderColor="pink.100" mx={10} my={4}>
