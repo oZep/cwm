@@ -1,13 +1,9 @@
 import { useRef, useState } from "react";
-import { Box, Button, HStack } from "@chakra-ui/react";
-import { Editor } from "@monaco-editor/react";
+import { Box, HStack } from "@chakra-ui/react";
 import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
 import Output from "./Output";
 import QuestionBox from "./QuestionBox";
-import * as Y from "yjs";
-import { WebsocketProvider } from "y-websocket";
-import { MonacoBinding } from "y-monaco";
 import { RealTimeMonaco } from "./RealTimeMonaco";
 
 const CodeEditor = () => {
@@ -17,28 +13,13 @@ const CodeEditor = () => {
     useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Removed duplicate onMount declaration
-
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
     setValue(CODE_SNIPPETS[language]);
   };
-
-  const ydocument = new Y.Doc();
-  const provider = new WebsocketProvider(
-    `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`,
-    "monaco",
-    ydocument
-  );
-  const type = ydocument.getText("monaco");
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
-    // const monacoBinding = new MonacoBinding(
-    //   type,
-    //   editor.getModel(),
-    //   new Set([editor]),
-    //   provider.awareness
-    // );
   };
 
   return (
@@ -55,11 +36,20 @@ const CodeEditor = () => {
             background={"blue.900"}
           >
             <RealTimeMonaco
-              height="100vh"
-              width="100vw"
-              name="YourName"
+              options={{
+                minimap: {
+                  enabled: false,
+                },
+              }}
+              theme="vs-dark"
+              language={language}
+              defaultValue={CODE_SNIPPETS[language]}
+              onMount={onMount}
+              value={value}
+              height="75vh"
               roomId="unique-room-id"
               color="#ff0000"
+              name="YourName"
             />
           </Box>
         </Box>
