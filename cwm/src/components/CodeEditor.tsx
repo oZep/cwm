@@ -4,6 +4,7 @@ import { Editor } from "@monaco-editor/react";
 import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
 import Output from "./Output";
+import QuestionBox from "./QuestionBox";
 
 const CodeEditor = () => {
   const editorRef = useRef();
@@ -21,8 +22,9 @@ const CodeEditor = () => {
   };
 
   return (
-    <Box>
-      <HStack spacing={4}>
+    <Box background={"purple.900"} minHeight="100vh" py={4}>
+      <QuestionBox question={"What is the capital of France?"}/> {/* This will be supplimented by an api call */}
+      <HStack spacing={4} mx={10} my={1}>
         <Box w="50%">
           <LanguageSelector language={language} onSelect={onSelect} />
           <Editor
