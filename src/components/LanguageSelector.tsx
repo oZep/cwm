@@ -14,12 +14,9 @@ const ACTIVE_COLOR = "purple.200";
 
 const LanguageSelector = ({ language, onSelect }) => {
   return (
-    <Box ml={2} mb={4}>
+    <Box mb={4}>
       <Menu isLazy>
-        <Text mb={2} fontSize="lg">
-          Language: 
-          <MenuButton as={Button} mx={2}>{language}</MenuButton>
-        </Text>
+        <MenuButton as={Button} borderColor={"blue.100"} color={"blue.100"} backgroundColor={"blue.900"} _hover={{ background: "blue.600" }} borderWidth={1}>{language}</MenuButton>
         <MenuList bg="purple.900">
           {languages.map(([lang, version]) => (
             <MenuItem
