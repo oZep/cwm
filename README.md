@@ -12,7 +12,4 @@ npm install
 # start the dev server
 
 npm run dev
-
-# Run the websocket server
-HOST=localhost PORT=1234 npx y-websocket
 ```
