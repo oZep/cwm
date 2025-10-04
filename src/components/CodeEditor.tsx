@@ -14,16 +14,7 @@ const CodeEditor = () => {
   const [value, setValue] = useState("");
   const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
 
-  const onMount = (editor: any) => {
-    editorRef.current = editor;
-    editor.focus();
-    // const monacoBinding = new MonacoBinding(
-    //   type,
-    //   editor.getModel(),
-    //   new Set([editor]),
-    //   provider.awareness
-    // );
-  };
+  // Removed duplicate onMount declaration
 
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
@@ -73,7 +64,7 @@ const CodeEditor = () => {
               defaultValue={CODE_SNIPPETS[language]}
               onMount={onMount}
               value={value}
-              onChange={(value) => setValue(value)}
+              onChange={(value) => setValue(value ?? "")}
             />
           </Box>
         </Box>
