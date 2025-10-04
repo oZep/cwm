@@ -43,7 +43,12 @@ export interface UsersType {
   };
 }
 export const RealTimeMonaco: FunctionComponent<
-  MonacoEditorProps & { name: string; roomId: string; color: string }
+  MonacoEditorProps & {
+    WebsocketURL: string;
+    name: string;
+    roomId: string;
+    color: string;
+  }
 > = ({ ...props }) => {
   const [allUsers, setAllUsers] = useState<UsersType[]>([]);
   const [monacoEditor, setMonacoEditor] =
@@ -207,7 +212,7 @@ export const RealTimeMonaco: FunctionComponent<
     const doc = new Y.Doc();
     const collaborateParam = collaborateId;
     const provider: WebsocketProvider = new WebsocketProvider(
-      "wss://demos.yjs.dev/ws",
+      props.WebsocketURL,
       collaborateParam,
       doc
     );

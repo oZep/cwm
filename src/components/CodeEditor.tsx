@@ -47,6 +47,7 @@ const CodeEditor = () => {
               onMount={onMount}
               value={value}
               height="75vh"
+              WebsocketURL="ws://localhost:1234"
               roomId="unique-room-id"
               color="#ff0000"
               name="YourName"
