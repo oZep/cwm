@@ -1,42 +1,25 @@
 import { useRef, useState } from "react";
-import { Box, Button, HStack } from "@chakra-ui/react";
-import { Editor } from "@monaco-editor/react";
+import { Box, HStack } from "@chakra-ui/react";
 import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
 import Output from "./Output";
 import QuestionBox from "./QuestionBox";
-import * as Y from "yjs";
-import { WebsocketProvider } from "y-websocket";
-import { MonacoBinding } from "y-monaco";
+import { RealTimeMonaco } from "./RealTimeMonaco";
 
 const CodeEditor = () => {
   const editorRef = useRef<{ getValue: () => string } | null>(null);
   const [value, setValue] = useState("");
-  const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [language, setLanguage] =
+    useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Removed duplicate onMount declaration
-
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
     setValue(CODE_SNIPPETS[language]);
   };
-
-  const ydocument = new Y.Doc();
-  const provider = new WebsocketProvider(
-    `${location.protocol === "http:" ? "ws:" : "wss:"}//localhost:1234`,
-    "monaco",
-    ydocument
-  );
-  const type = ydocument.getText("monaco");
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
-    const monacoBinding = new MonacoBinding(
-      type,
-      editor.getModel(),
-      new Set([editor]),
-      provider.awareness
-    );
   };
 
   return (
@@ -52,19 +35,22 @@ const CodeEditor = () => {
             borderRadius={4}
             background={"blue.900"}
           >
-            <Editor
+            <RealTimeMonaco
               options={{
                 minimap: {
                   enabled: false,
                 },
               }}
-              height="75vh"
               theme="vs-dark"
               language={language}
               defaultValue={CODE_SNIPPETS[language]}
               onMount={onMount}
               value={value}
-              onChange={(value) => setValue(value ?? "")}
+              height="75vh"
+              WebsocketURL="ws://localhost:1234"
+              roomId="unique-room-id"
+              color="#ff0000"
+              name="YourName"
             />
           </Box>
         </Box>

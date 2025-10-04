@@ -1,3 +1,4 @@
+// From https://github.com/shauryag2002/real-time-monaco/blob/2a559ce1d69f9649053fd50b58b275139257a398/src/components/RealTimeMonaco/RealTimeMonaco.tsx
 import { useMemo, useEffect, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import * as Y from "yjs";
@@ -43,7 +44,12 @@ export interface UsersType {
   };
 }
 export const RealTimeMonaco: FunctionComponent<
-  MonacoEditorProps & { name: string; roomId: string; color: string }
+  MonacoEditorProps & {
+    WebsocketURL: string;
+    name: string;
+    roomId: string;
+    color: string;
+  }
 > = ({ ...props }) => {
   const [allUsers, setAllUsers] = useState<UsersType[]>([]);
   const [monacoEditor, setMonacoEditor] =
@@ -207,7 +213,7 @@ export const RealTimeMonaco: FunctionComponent<
     const doc = new Y.Doc();
     const collaborateParam = collaborateId;
     const provider: WebsocketProvider = new WebsocketProvider(
-      "wss://demos.yjs.dev/ws",
+      props.WebsocketURL,
       collaborateParam,
       doc
     );
