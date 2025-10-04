@@ -25,21 +25,6 @@ updates.append(Update(hash(updates[0]), Diff('remove', '', 12)))
 #     hash(text): text,
 # }
 
-def apply(u, updates):
-  for i in range(len(updates)):
-    if i == u:
-      continue
-    if updates[i].hash != updates[u].hash:
-      continue
-    match updates[i].diff, updates[u].diff:
-      case Diff('remove' | 'append', _, _), Diff('remove', _, _):
-        updates[i].hash = hash(updates[u])
-        updates[i].diff.idx -= updates[i].diff.idx > updates[u].diff.idx
-      case Diff('remove' | 'append', _, _), Diff('append', _, _):
-        updates[i].hash = hash(updates[u])
-        updates[i].diff.idx += updates[i].diff.idx > updates[u].diff.idx
-    apply(u, updates)
-
 done = False
 while not done:
   done = True
@@ -47,7 +32,14 @@ while not done:
     for j in range(i + 1, len(updates)):
       if updates[i].hash == updates[j].hash:
         u = i if updates[i].diff < updates[j].diff else j
-        apply(u, updates)
+        v = j if updates[i].diff < updates[j].diff else i
+        match updates[v].diff, updates[u].diff:
+          case Diff('remove' | 'append', _, _), Diff('remove', _, _):
+            updates[v].hash = hash(updates[u])
+            updates[v].diff.idx -= updates[v].diff.idx > updates[u].diff.idx
+          case Diff('remove' | 'append', _, _), Diff('append', _, _):
+            updates[v].hash = hash(updates[u])
+            updates[v].diff.idx += updates[v].diff.idx > updates[u].diff.idx
         done = False
 
 curr_hash = hash(text)
