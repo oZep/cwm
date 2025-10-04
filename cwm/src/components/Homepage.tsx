@@ -836,7 +836,7 @@ export default function CallToActionWithIllustration() {
           fontWeight={600}
           fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}>
-          Meeting scheduling{' '}
+          Code With Me{' '}
           <Text as={'span'} color={'orange.400'}>
             made easy
           </Text>
@@ -853,7 +853,7 @@ export default function CallToActionWithIllustration() {
             colorScheme={'orange'}
             bg={'orange.400'}
             _hover={{ bg: 'orange.500' }}>
-            Get started
+            <a href="/editor">Get Started</a>
           </Button>
           <Button rounded={'full'} px={6}>
             Learn more
