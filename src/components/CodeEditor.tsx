@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, Button, HStack } from "@chakra-ui/react";
 import { Editor } from "@monaco-editor/react";
 import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
