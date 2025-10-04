@@ -29,13 +29,10 @@ const CodeEditor = () => {
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
-    // console.log(type);
-    // console.log(editor.getModel());
-    // console.log(provider.awareness);
     const monacoBinding = new MonacoBinding(
       type,
-      editor.current.getModel(),
-      new Set([editor.current]),
+      editor.getModel(),
+      new Set([editor]),
       provider.awareness
     );
   };
