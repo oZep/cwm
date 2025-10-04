@@ -7,7 +7,8 @@ import {
   Stack,
   Text,
   Button,
-  Box
+  Box,
+  Image
 } from '@chakra-ui/react'
 
 import { Illustration } from './Illustration'
@@ -45,9 +46,7 @@ export default function CallToActionWithIllustration() {
             <a href="/editor">Get Started</a>
           </Button>
         </Stack>
-        <Flex w={'full'}>
-          <Illustration height={{ sm: '24rem', lg: '28rem' }} mt={{ base: 12, sm: 16 }} />
-        </Flex>
+          <Image src="/girl.png" alt="Illustration" />
       </Stack>
       <Heading
         fontWeight={600}
