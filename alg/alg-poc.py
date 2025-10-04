@@ -46,9 +46,8 @@ while not done:
   for i in range(len(updates)):
     for j in range(i + 1, len(updates)):
       if updates[i].hash == updates[j].hash:
-        fst = i if updates[i].diff < updates[j].diff else j
-        snd = j if updates[i].diff < updates[j].diff else i
-        apply(fst, updates)
+        u = i if updates[i].diff < updates[j].diff else j
+        apply(u, updates)
         done = False
 
 curr_hash = hash(text)
