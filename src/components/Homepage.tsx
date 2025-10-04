@@ -48,15 +48,23 @@ export default function CallToActionWithIllustration() {
             fontWeight={600}
             fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
             lineHeight={'110%'}>
-            Code With Me{' '}
-            <Text as={'span'} color={'pink.400'}>
-              made easy
-            </Text>
+            Code With{' '}<Text as={'span'} color={'pink.400'}>Me</Text>
           </Heading>
-          <Text maxW={'3xl'}>
-            Never miss a meeting. Never be late for one too. Keep track of your meetings and receive
-            smart reminders in appropriate times. Read your smart “Daily Agenda” every morning.
-          </Text>
+            <Text as="em" display="inline" fontSize={{ base: 'lg', sm: 'xl' }} color={'gray.300'} mb={1}>
+              Stop struggling alone.
+            </Text>
+            <Text maxW={'3xl'}>
+            <Text color={'gray.300'} fontSize={{ base: 'lg', sm: 'xl' }}>
+              Code With Me instantly connects you with{' '}
+              <Text as="span" fontWeight="bold" color="pink.400">
+              mentors, peers, and fellow developers
+              </Text>{' '}
+              so you can write, review, and learn together. Instantly share your environment, debug together, and turn code reviews into a{' '}
+              <Text as="span" fontWeight="bold" color="pink.400">
+              fluid, real-time conversation.
+              </Text>
+            </Text>
+            </Text>
           <Stack spacing={6} direction={'row'}>
             <Button
               as={'a'}
