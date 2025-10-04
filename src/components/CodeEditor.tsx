@@ -7,16 +7,16 @@ import Output from "./Output";
 import QuestionBox from "./QuestionBox";
 
 const CodeEditor = () => {
-  const editorRef = useRef();
+  const editorRef = useRef<{ getValue: () => string } | null>(null);
   const [value, setValue] = useState("");
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   const onMount = (editor: any) => {
     editorRef.current = editor;
     editor.focus();
   };
 
-  const onSelect = (language) => {
+  const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
     setValue(CODE_SNIPPETS[language]);
   };
@@ -40,7 +40,7 @@ const CodeEditor = () => {
             defaultValue={CODE_SNIPPETS[language]}
             onMount={onMount}
             value={value}
-            onChange={(value) => setValue(value)}
+            onChange={(value) => setValue(value ?? "")}
           />
           </Box>
         </Box>
