@@ -16,11 +16,11 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import { useSignalWS } from "../context/SignalWSProvider";
-import LanguageSelector from "../components/LanguageSelector";
+import LanguageSelector from "./LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
-import Output from "../components/Output";
-import QuestionBox from "../components/QuestionBox";
-import { RealTimeMonaco } from "../components/RealTimeMonaco";
+import Output from "./Output";
+import QuestionBox from "./QuestionBox";
+import { RealTimeMonaco } from "./RealTimeMonaco";
 
 const MotionBox = motion(Box);
 const MotionHStack = motion(HStack);
@@ -37,12 +37,17 @@ const CodeEditor = () => {
   const roomId = searchParams.get("roomId") || "missing-room";
 
   const editorRef = useRef<{ getValue: () => string } | null>(null);
-  const [value, setValue] = useState(""); // keep, if your RealTimeMonaco ignores 'value' it's harmless
-  const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [value] = useState(""); // keep if RealTimeMonaco ignores 'value' it's harmless
   const [isLoaded, setIsLoaded] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const [showMainContent, setShowMainContent] = useState(false);
   const [question, setQuestion] = useState<any | null>(null);
+
+  // Language states:
+  // - agreedLanguage: language committed by server after consensus
+  // - displayLanguage: language used for Monaco syntax highlighting immediately (local preview)
+  const [agreedLanguage, setAgreedLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [displayLanguage, setDisplayLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Voting UI states
   const [pendingLang, setPendingLang] = useState<string | null>(null);
@@ -63,9 +68,10 @@ const CodeEditor = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Propose a language vote instead of switching immediately
+  // Propose a language vote and preview it locally (fixes “r is undefined” in JS mode)
   const onSelect = (lang: keyof typeof CODE_SNIPPETS) => {
     setPendingLang(lang);
+    setDisplayLanguage(lang); // Local, immediate syntax highlighting preview
     send({ type: 'LANGUAGE_VOTE', data: { language: String(lang) } });
   };
 
@@ -75,16 +81,15 @@ const CodeEditor = () => {
     setEditorMounted(true);
   };
 
-  // Request question when signal WS opens and when language is committed by server
+  // Request question when signal WS opens for agreedLanguage
   useEffect(() => {
     if (status !== "open") return;
 
     const offQuestion = on("QUESTION_DETAILS", (msg: any) => setQuestion(msg.data));
-    send({ type: "REQUEST_QUESTION", data: { language } });
+    send({ type: "REQUEST_QUESTION", data: { language: agreedLanguage } });
 
     return () => { offQuestion(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, agreedLanguage, on, send]);
 
   // Subscribe to language voting events
   useEffect(() => {
@@ -92,27 +97,31 @@ const CodeEditor = () => {
 
     const offSet = on('LANGUAGE_SET', (m: any) => {
       const newLang = m.data.language as keyof typeof CODE_SNIPPETS;
-      // Only switch language on server-approved commit
-      setLanguage(newLang);
+      // Only switch the agreed language on server-approved commit
+      setAgreedLanguage(newLang);
+      setDisplayLanguage(newLang);
       setPendingLang(null);
       setLangVoteProgress(null);
-      // Optionally request the problem variant for this language
+      // Optionally refresh the problem variant for this language
       send({ type: 'REQUEST_QUESTION', data: { language: newLang } });
       toast({ status: 'success', title: `Language set to ${newLang}` });
     });
 
     const offProgress = on('LANGUAGE_VOTE_PROGRESS', (m: any) => {
       setLangVoteProgress(m.data);
+      // Optional: follow the room’s latest proposal automatically:
+      // setDisplayLanguage(m.data.language as keyof typeof CODE_SNIPPETS);
     });
 
     const offRejected = on('LANGUAGE_VOTE_REJECTED', (m: any) => {
       setPendingLang(null);
+      setDisplayLanguage(agreedLanguage); // Revert local preview if rejected/locked
       const until = m.data?.until ? ` (until ${new Date(m.data.until).toLocaleTimeString()})` : '';
       toast({ status: 'info', title: 'Language change locked', description: `Current: ${m.data?.current}${until}` });
     });
 
     return () => { offSet(); offProgress(); offRejected(); };
-  }, [status, on, send, toast]);
+  }, [status, on, send, toast, agreedLanguage]);
 
   // Subscribe to run voting events
   useEffect(() => {
@@ -137,7 +146,8 @@ const CodeEditor = () => {
     if (!editorRef.current) return;
     const code = editorRef.current.getValue();
     const hash = await sha256Hex(code);
-    send({ type: 'RUN_REQUEST', data: { language: String(language), codeHash: hash } });
+    // Vote to run with the AGREED language to keep execution consistent
+    send({ type: 'RUN_REQUEST', data: { language: String(agreedLanguage), codeHash: hash } });
   };
 
   return (
@@ -207,15 +217,18 @@ const CodeEditor = () => {
               whileHover={{ scale: 1.002 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
-              {/* Top bar with language and run voting UI */}
+              {/* Top bar: language voting + run voting UI */}
               <HStack justify="space-between" mb={3}>
                 <Box>
-                  <LanguageSelector language={language} onSelect={onSelect} />
+                  <LanguageSelector language={displayLanguage} onSelect={onSelect} />
                   {pendingLang && <Badge ml={2} colorScheme="purple">Voted: {pendingLang}</Badge>}
                   {langVoteProgress && (
                     <Badge ml={2} colorScheme="pink">
                       {langVoteProgress.language}: {langVoteProgress.votesFor}/{langVoteProgress.total}
                     </Badge>
+                  )}
+                  {agreedLanguage !== displayLanguage && (
+                    <Badge ml={2} colorScheme="yellow">Preview</Badge>
                   )}
                 </Box>
                 <Button colorScheme="green" onClick={handleRunClick}>
@@ -252,7 +265,7 @@ const CodeEditor = () => {
               >
                 <AnimatePresence mode="wait">
                   <MotionBox
-                    key={language}
+                    key={displayLanguage}
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
@@ -269,8 +282,8 @@ const CodeEditor = () => {
                         cursorSmoothCaretAnimation: "on"
                       }}
                       theme="vs-dark"
-                      language={language}
-                      defaultValue={CODE_SNIPPETS[language]}
+                      language={displayLanguage}                 // instant preview fixes false errors
+                      defaultValue={CODE_SNIPPETS[agreedLanguage]} // only pull snippet for agreed language on mount
                       onMount={onMount}
                       value={value}
                       height="75vh"
@@ -298,7 +311,8 @@ const CodeEditor = () => {
                 initialScale={0.95}
                 style={{ display: "flex", flex: 5, flexDirection: "column" }}
               >
-                <Output editorRef={editorRef} language={language} />
+                {/* Use AGREED language for execution-related UI */}
+                <Output editorRef={editorRef} language={agreedLanguage} />
               </ScaleFade>
             </MotionBox>
           </MotionHStack>
