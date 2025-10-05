@@ -45,8 +45,7 @@ Key features include:
 
 The primary challenge was ensuring true, low-latency, conflict-free synchronization across multiple users in the code editor. Implementing Yjs correctly to handle concurrent edits—especially for complex structures like code—required careful state management and robust WebSocket handling on the backend. Integrating the code execution API also presented challenges in managing asynchronous responses and displaying error messages cleanly within our real-time environment.
 
-[Bricktech cooks here]
-
+Before settling on Yjs for its implementation of shared cursors (several people editing the same text document concurrently), we went back to first principles and came up with [an algorithm](alg/alg-poc.py) for zero-latency synchronization between clients via pub/sub. The algorithm’s input is a pool of conflicting concurrent changes to the text document obtained asynchronously from all users—changes like appendning a word to a line, removing a character within a line, and so on—and its output is an ordered sequence of deconflicted updates that can are applied in turn to the text document. The result is seamless synchronization of the text document and updates thereof that appears instantaneous to users.
 
 ### 🏆 Accomplishments that we're proud of
 
