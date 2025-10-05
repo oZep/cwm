@@ -31,6 +31,35 @@ server.on("upgrade", (request, socket, head) => {
   );
 });
 
+
+server.on("message", (msg) => {
+  try {
+
+    // getProblemDetails {"type": "REQUEST_QUESTION", "data": {"id": 1, "language": "javascript"}}'
+    const message = JSON.parse(msg.toString());
+
+    if (message.type === "REQUEST_QUESTION") {
+      const { id, language } = message.data || {};
+
+      const problem = getProblemDetails(id, language);
+
+      const response = {
+          type: 'QUESTION_RESPONSE',
+          success: !!problem,
+          data: problem 
+      };
+
+      if (problem) {
+        server.send(JSON.stringify(response));
+      } else {
+        server.send(JSON.stringify({ type: "ERROR", message: "Problem not found" }));
+      }
+    }
+  } catch (error) {
+    console.error("Error handling message:", error);
+  }
+});
+
 server.listen(port, host, () => {
   console.log(`running at '${host}' on port ${port}`);
 });
