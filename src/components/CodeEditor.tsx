@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRef, useState, useEffect } from "react";
 import {
@@ -12,7 +12,7 @@ import {
   Button,
   Badge,
   useToast,
-  Spinner
+  Spinner,
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -29,8 +29,10 @@ const MotionHStack = motion(HStack);
 // Hash helper for submit voting
 async function sha256Hex(str: string) {
   const enc = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 const CodeEditor = () => {
@@ -46,13 +48,22 @@ const CodeEditor = () => {
   const [question, setQuestion] = useState<any | null>(null);
 
   // Language states: agreed (server) vs display (local preview)
-  const [agreedLanguage, setAgreedLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
-  const [displayLanguage, setDisplayLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [agreedLanguage, setAgreedLanguage] =
+    useState<keyof typeof CODE_SNIPPETS>("javascript");
+  const [displayLanguage, setDisplayLanguage] =
+    useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Voting UI states
   const [pendingLang, setPendingLang] = useState<string | null>(null);
-  const [langVoteProgress, setLangVoteProgress] = useState<{ language: string; votesFor: number; total: number } | null>(null);
-  const [submitProgress, setSubmitProgress] = useState<{ votes: number; total: number } | null>(null);
+  const [langVoteProgress, setLangVoteProgress] = useState<{
+    language: string;
+    votesFor: number;
+    total: number;
+  } | null>(null);
+  const [submitProgress, setSubmitProgress] = useState<{
+    votes: number;
+    total: number;
+  } | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
 
   const toast = useToast();
@@ -73,7 +84,7 @@ const CodeEditor = () => {
   const onSelect = (lang: keyof typeof CODE_SNIPPETS) => {
     setPendingLang(lang);
     setDisplayLanguage(lang); // local preview
-    send({ type: 'LANGUAGE_VOTE', data: { language: String(lang) } });
+    send({ type: "LANGUAGE_VOTE", data: { language: String(lang) } });
   };
 
   const onMount = (editor: any) => {
@@ -86,76 +97,111 @@ const CodeEditor = () => {
   useEffect(() => {
     if (status !== "open") return;
 
-    const offQuestion = on("QUESTION_DETAILS", (msg: any) => setQuestion(msg.data));
+    const offQuestion = on("QUESTION_DETAILS", (msg: any) =>
+      setQuestion(msg.data)
+    );
     send({ type: "REQUEST_QUESTION", data: { language: agreedLanguage } });
 
-    return () => { offQuestion(); };
+    return () => {
+      offQuestion();
+    };
   }, [status, agreedLanguage, on, send]);
 
   // Subscribe to language voting events
   useEffect(() => {
-    if (status !== 'open') return;
+    if (status !== "open") return;
 
-    const offSet = on('LANGUAGE_SET', (m: any) => {
+    const offSet = on("LANGUAGE_SET", (m: any) => {
       const newLang = m.data.language as keyof typeof CODE_SNIPPETS;
       setAgreedLanguage(newLang);
       setDisplayLanguage(newLang);
       setPendingLang(null);
       setLangVoteProgress(null);
-      send({ type: 'REQUEST_QUESTION', data: { language: newLang } });
-      toast({ status: 'success', title: `Language set to ${newLang}` });
+      send({ type: "REQUEST_QUESTION", data: { language: newLang } });
+      toast({ status: "success", title: `Language set to ${newLang}` });
     });
 
-    const offProgress = on('LANGUAGE_VOTE_PROGRESS', (m: any) => {
+    const offProgress = on("LANGUAGE_VOTE_PROGRESS", (m: any) => {
       setLangVoteProgress(m.data);
     });
 
-    const offRejected = on('LANGUAGE_VOTE_REJECTED', (m: any) => {
+    const offRejected = on("LANGUAGE_VOTE_REJECTED", (m: any) => {
       setPendingLang(null);
       setDisplayLanguage(agreedLanguage); // revert preview
-      const until = m.data?.until ? ` (until ${new Date(m.data.until).toLocaleTimeString()})` : '';
-      toast({ status: 'info', title: 'Language change locked', description: `Current: ${m.data?.current}${until}` });
+      const until = m.data?.until
+        ? ` (until ${new Date(m.data.until).toLocaleTimeString()})`
+        : "";
+      toast({
+        status: "info",
+        title: "Language change locked",
+        description: `Current: ${m.data?.current}${until}`,
+      });
     });
 
-    return () => { offSet(); offProgress(); offRejected(); };
+    return () => {
+      offSet();
+      offProgress();
+      offRejected();
+    };
   }, [status, on, send, toast, agreedLanguage]);
 
   // Subscribe to submit voting events
   useEffect(() => {
-    if (status !== 'open') return;
+    if (status !== "open") return;
 
-    const offProg = on('SUBMIT_PROGRESS', (m: any) => {
+    const offProg = on("SUBMIT_PROGRESS", (m: any) => {
       setSubmitProgress(m.data);
     });
-    const offConflict = on('SUBMIT_CONFLICT', (m: any) => {
+    const offConflict = on("SUBMIT_CONFLICT", (m: any) => {
       setSubmitProgress(null);
       setIsEvaluating(false);
-      toast({ status: 'warning', title: 'Submit mismatch', description: m.data.reason.replace('_', ' ') });
+      toast({
+        status: "warning",
+        title: "Submit mismatch",
+        description: m.data.reason.replace("_", " "),
+      });
     });
-    const offStarted = on('SUBMIT_STARTED', () => {
+    const offStarted = on("SUBMIT_STARTED", () => {
       setIsEvaluating(true);
     });
-    const offSuccess = on('SUBMIT_SUCCESS', (m: any) => {
+    const offSuccess = on("SUBMIT_SUCCESS", (m: any) => {
       setIsEvaluating(false);
       setSubmitProgress(null);
-      toast({ status: 'success', title: 'Accepted ✔', description: m.data?.message || '' });
+      toast({
+        status: "success",
+        title: "Accepted ✔",
+        description: m.data?.message || "",
+      });
       // Redirect both clients to homepage
-      navigate('/');
+      navigate("/");
     });
-    const offFail = on('SUBMIT_FAIL', (m: any) => {
+    const offFail = on("SUBMIT_FAIL", (m: any) => {
       setIsEvaluating(false);
       setSubmitProgress(null);
-      toast({ status: 'error', title: 'Wrong Answer', description: m.data?.message || '' });
+      toast({
+        status: "error",
+        title: "Wrong Answer",
+        description: m.data?.message || "",
+      });
     });
 
-    return () => { offProg(); offConflict(); offStarted(); offSuccess(); offFail(); };
+    return () => {
+      offProg();
+      offConflict();
+      offStarted();
+      offSuccess();
+      offFail();
+    };
   }, [status, on, toast, navigate]);
 
   const handleSubmitClick = async () => {
     if (!editorRef.current) return;
     const code = editorRef.current.getValue();
     const hash = await sha256Hex(code);
-    send({ type: 'SUBMIT_REQUEST', data: { language: String(agreedLanguage), codeHash: hash, code } });
+    send({
+      type: "SUBMIT_REQUEST",
+      data: { language: String(agreedLanguage), codeHash: hash, code },
+    });
   };
 
   return (
@@ -187,18 +233,22 @@ const CodeEditor = () => {
             bg="whiteAlpha.200"
             borderRadius="full"
             initial={{
-              x: Math.random() * (typeof window !== "undefined" ? window.innerWidth : 1200),
-              y: Math.random() * (typeof window !== "undefined" ? window.innerHeight : 800),
-              opacity: 0
+              x:
+                Math.random() *
+                (typeof window !== "undefined" ? window.innerWidth : 1200),
+              y:
+                Math.random() *
+                (typeof window !== "undefined" ? window.innerHeight : 800),
+              opacity: 0,
             }}
             animate={{
               y: [null, -20, 20],
-              opacity: [0, 0.6, 0]
+              opacity: [0, 0.6, 0],
             }}
             transition={{
               duration: 3 + Math.random() * 2,
               repeat: Infinity,
-              delay: Math.random() * 2
+              delay: Math.random() * 2,
             }}
           />
         ))}
@@ -228,27 +278,40 @@ const CodeEditor = () => {
               {/* Top bar: language voting + submit voting UI */}
               <HStack justify="space-between" mb={2} pt={2}>
                 <Box>
-                  <LanguageSelector language={displayLanguage} onSelect={onSelect} />
-                  {pendingLang && <Badge ml={2} colorScheme="purple">Voted: {pendingLang}</Badge>}
+                  <LanguageSelector
+                    language={displayLanguage}
+                    onSelect={onSelect}
+                  />
+                  {pendingLang && (
+                    <Badge ml={2} colorScheme="purple">
+                      Voted: {pendingLang}
+                    </Badge>
+                  )}
                   {langVoteProgress && (
                     <Badge ml={2} colorScheme="pink">
-                      {langVoteProgress.language}: {langVoteProgress.votesFor}/{langVoteProgress.total}
+                      {langVoteProgress.language}: {langVoteProgress.votesFor}/
+                      {langVoteProgress.total}
                     </Badge>
                   )}
                   {agreedLanguage !== displayLanguage && (
-                    <Badge ml={2} colorScheme="yellow">Preview</Badge>
+                    <Badge ml={2} colorScheme="yellow">
+                      Preview
+                    </Badge>
                   )}
                 </Box>
-                <Button 
-                  colorScheme="green" 
-                  onClick={handleSubmitClick} 
+                <Button
+                  colorScheme="green"
+                  onClick={handleSubmitClick}
                   isDisabled={isEvaluating}
                   variant="outline"
                   background={"green.900"}
                   _hover={{ background: "green.600" }}
                 >
                   {isEvaluating ? <Spinner size="sm" mr={2} /> : null}
-                  Submit {submitProgress ? `(${submitProgress.votes}/${submitProgress.total})` : ''}
+                  Submit{" "}
+                  {submitProgress
+                    ? `(${submitProgress.votes}/${submitProgress.total})`
+                    : ""}
                 </Button>
               </HStack>
 
@@ -265,7 +328,7 @@ const CodeEditor = () => {
                 transition={{ delay: 0.6, duration: 0.5 }}
                 whileHover={{
                   boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4)",
-                  borderColor: "pink.200"
+                  borderColor: "pink.200",
                 }}
                 _before={{
                   content: '""',
@@ -276,7 +339,7 @@ const CodeEditor = () => {
                   height: "2px",
                   bgGradient: "linear(to-r, pink.400, purple.400, blue.400)",
                   opacity: editorMounted ? 1 : 0,
-                  transition: "opacity 0.5s ease"
+                  transition: "opacity 0.5s ease",
                 }}
               >
                 <AnimatePresence mode="wait">
@@ -295,10 +358,10 @@ const CodeEditor = () => {
                         padding: { top: 16, bottom: 16 },
                         smoothScrolling: true,
                         cursorBlinking: "smooth",
-                        cursorSmoothCaretAnimation: "on"
+                        cursorSmoothCaretAnimation: "on",
                       }}
                       theme="vs-dark"
-                      language={displayLanguage}                 // instant preview fixes false errors
+                      language={displayLanguage} // instant preview fixes false errors
                       defaultValue={CODE_SNIPPETS[agreedLanguage]} // only pull snippet for agreed language on mount
                       onMount={onMount}
                       value={value}

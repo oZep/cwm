@@ -45,6 +45,9 @@ Key features include:
 
 The primary challenge was ensuring true, low-latency, conflict-free synchronization across multiple users in the code editor. Implementing Yjs correctly to handle concurrent edits—especially for complex structures like code—required careful state management and robust WebSocket handling on the backend. Integrating the code execution API also presented challenges in managing asynchronous responses and displaying error messages cleanly within our real-time environment.
 
+[Bricktech cooks here]
+
+
 ### 🏆 Accomplishments that we're proud of
 
 We are most proud of achieving a truly seamless, real-time collaborative coding experience. The ability to instantly share and modify code without lag, combined with integrated code execution, means the platform genuinely mimics an in-person, over-the-shoulder debugging session. We've successfully built a complex application that remains accessible and intuitive for beginners.
@@ -70,5 +73,6 @@ npm run dev
 ```
 ## Architecture
 <img width="5344" height="1868" alt="diagram" src="https://github.com/user-attachments/assets/e6794ed4-c033-4b6e-8ada-8dfa90b5c235" />
+
 ![20251005_095301](https://github.com/user-attachments/assets/01eceb48-9c1a-4ac5-9891-bae4913104e4)
 
