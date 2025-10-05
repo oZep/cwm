@@ -73,5 +73,6 @@ npm run dev
 ```
 ## Architecture
 <img width="5344" height="1868" alt="diagram" src="https://github.com/user-attachments/assets/e6794ed4-c033-4b6e-8ada-8dfa90b5c235" />
+
 ![20251005_095301](https://github.com/user-attachments/assets/01eceb48-9c1a-4ac5-9891-bae4913104e4)
 
