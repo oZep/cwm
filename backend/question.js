@@ -45,3 +45,5 @@ function getProblemDetails(id = null, language = null) {
 
     return result;
 }
+
+export { getProblemDetails };
