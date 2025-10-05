@@ -8,7 +8,6 @@ import {
   Fade,
   ScaleFade,
   SlideFade,
-  Text,
   Button,
   Badge,
   useToast,
@@ -22,6 +21,7 @@ import { CODE_SNIPPETS } from "../constants";
 import Output from "../components/Output";
 import QuestionBox from "../components/QuestionBox";
 import { RealTimeMonaco } from "../components/RealTimeMonaco";
+import "./CodeEditor.css";
 
 const MotionBox = motion(Box);
 const MotionHStack = motion(HStack);

@@ -1,0 +1,19 @@
+.yRemoteSelection {
+  background-color: rgba(107, 33, 168, 0.3);
+}
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: rgba(107, 33, 168, 1) solid 2px;
+  border-top: rgba(107, 33, 168, 1) solid 2px;
+  border-bottom: rgba(107, 33, 168, 1) solid 2px;
+  height: 100%;
+  box-sizing: border-box;
+}
+.yRemoteSelectionHead::after {
+  position: absolute;
+  content: " ";
+  border: 3px solid rgba(107, 33, 168, 1);
+  border-radius: 4px;
+  left: -4px;
+  top: -5px;
+}
