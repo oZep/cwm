@@ -114,7 +114,7 @@ server.on("message", (msg) => {
     const message = JSON.parse(msg.toString());
     const clientId = connections.get(server);
 
-    if (data.type === "JOIN") {
+    if (message.type === "JOIN") {
         processJoinRequest(server, clientId); // handles both client waiting and pairing messaging
     }
 
