@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Button, Text, useToast } from "@chakra-ui/react";
+import { Box, Button, Text, useToast, HStack } from "@chakra-ui/react";
 import { executeCode } from "../api";
 
 interface OutputProps {
@@ -38,8 +38,14 @@ const Output = ({ editorRef, language }: OutputProps) => {
   };
 
   return (
-    <Box w="50%">
-      <Box display="flex" justifyContent="space-between" mb={4}>
+    <Box
+      width="100%"      // 1. Take up the full width given by the parent
+      height="100%"     // 2. Take up the full height
+      display="flex"    // 3. Use flexbox for internal layout
+      flexDirection="column"
+      borderRadius={8}
+    >
+      <HStack p={2} justifyContent="space-between">
         <Button
           variant="outline"
           colorScheme="green"
@@ -63,13 +69,13 @@ const Output = ({ editorRef, language }: OutputProps) => {
         >
           Exit
         </Button>
-      </Box>
+      </HStack>
       <Box
-        height="75vh"
+        flex={1} // 4. This makes the output box grow to fill all remaining vertical space
         p={2}
         color={isError ? "red.400" : ""}
         border="1px solid"
-        borderRadius={4}
+        borderRadius={8}
         borderColor={isError ? "red.500" : "pink.100"}
         background={"blackAlpha.400"}
       >
@@ -80,4 +86,5 @@ const Output = ({ editorRef, language }: OutputProps) => {
     </Box>
   );
 };
+
 export default Output;
