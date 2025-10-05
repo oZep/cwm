@@ -403,7 +403,7 @@ const CodeEditor = () => {
                       defaultValue={CODE_SNIPPETS[agreedLanguage] ?? ""} // ensure string
                       onMount={onMount}
                       height="75vh"
-                      WebsocketURL={`wss://${window.location.hostname}:10000/yjs`}
+                      WebsocketURL="ws://localhost:1234/yjs"
                       roomId={roomId}
                       color="#ff0000"
                       name="YourName"

@@ -35,7 +35,7 @@ type Ctx = {
 const SignalWSContext = createContext<Ctx | null>(null);
 
 export function SignalWSProvider({
-  url = `wss://${window.location.hostname}:10000/signal`,
+  url = 'ws://localhost:1234/signal',
   children,
 }: {
   url?: string;
