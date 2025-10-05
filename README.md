@@ -68,5 +68,5 @@ npm install
 
 npm run dev
 ```
-# Architecture
+## Architecture
 <img width="5344" height="1868" alt="diagram" src="https://github.com/user-attachments/assets/e6794ed4-c033-4b6e-8ada-8dfa90b5c235" />
