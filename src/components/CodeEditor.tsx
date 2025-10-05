@@ -6,6 +6,22 @@ import Output from "./Output";
 import QuestionBox from "./QuestionBox";
 import { RealTimeMonaco } from "./RealTimeMonaco";
 
+const requestRandomProblem = (id: number | null, language: string | null, ws: WebSocket) => {
+    const request = {
+        type: "REQUEST_QUESTION",
+        data: {
+            id: id,
+            language: language
+        }
+    };
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(request));
+    } else {
+        console.warn('WebSocket connection is not open.');
+    }
+} // then use event listener to listen for messages from the server, and send that back to the client?? at this level?
+
+
 const CodeEditor = () => {
   const editorRef = useRef<{ getValue: () => string } | null>(null);
   const [value, setValue] = useState("");
