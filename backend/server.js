@@ -109,7 +109,6 @@ server.on("upgrade", (request, socket, head) => {
 
 server.on("message", (msg) => {
   try {
-
     // getProblemDetails {"type": "REQUEST_QUESTION", "data": {"id": 1, "language": "javascript"}}'
     const message = JSON.parse(msg.toString());
     const clientId = connections.get(server);
