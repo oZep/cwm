@@ -58,6 +58,29 @@ function processJoinRequest(wsRequester, clientId) { // ws instance, clientId st
     }
 }
 
+function handleRequestQuestion(ws, message, messageData) {
+  const clientId = connections.get(ws);
+  const roomId = clientRooms.get(clientId);
+
+  if (!roomId) {
+    ws.send(JSON.stringify({ type: "ERROR", message: "You are not in a room" }));
+    return;
+  }
+
+  // if the room does not have a question id assigned yet, assign one now
+  if (!rooms.get(roomId).problem) {
+    const { id, language } = message.data || {};
+    const problem = getProblemDetails(id, language);
+    rooms.get(roomId).problem = problem;
+    response = { type: "QUESTION_DETAILS", success: true, data: problem };
+
+  } else {
+    response = { type: "QUESTION_DETAILS", success: true, data: rooms.get(roomId).problem };
+  }
+
+  ws.send(JSON.stringify(response));
+}
+
 const wss = new WebSocketServer({ noServer: true });
 const host = process.env.HOST || "localhost";
 const port = number.parseInt(process.env.PORT || "1234");
@@ -96,21 +119,7 @@ server.on("message", (msg) => {
     }
 
     if (message.type === "REQUEST_QUESTION") {
-      const { id, language } = message.data || {};
-
-      const problem = getProblemDetails(id, language);
-
-      const response = {
-          type: 'QUESTION_RESPONSE',
-          success: !!problem,
-          data: problem 
-      };
-
-      if (problem) {
-        server.send(JSON.stringify(response));
-      } else {
-        server.send(JSON.stringify({ type: "ERROR", message: "Problem not found" }));
-      }
+      handleRequestQuestion(server, message, message.data || {});
     }
   } catch (error) {
     console.error("Error handling message:", error);
