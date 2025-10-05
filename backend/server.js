@@ -1,137 +1,144 @@
 #!/usr/bin/env node
-import { WebSocketServer } from "ws";
-import http from "http";
-import * as number from "lib0/number";
-import { setupWSConnection } from "./utils.js";
-import { getProblemDetails } from "./question.js";
-import { data } from "react-router-dom";
+import http from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
+import * as number from 'lib0/number';
+import { setupWSConnection } from './utils.js';
+import { getProblemDetails } from './question.js';
 
-// Map: { 'room-xyz': Set<ws_A, ws_B> }
-const rooms = new Map()
-// Map: { 'client-abc': 'room-xyz' } 
-const clientRooms = new Map(); 
-// Array: Stores clients (their unique ws objects) waiting for a partner.
-// A client waiting in the queue is NOT yet in a room.
-const waitingQueue = []; 
-// Map: Used for connection management and cleanup.
-const connections = new Map();
-let clientIdCounter = 0; 
+// State
+const rooms = new Map(); // roomId -> { clients: Set<WebSocket>, problem?: any }
+const clientRooms = new Map(); // clientId -> roomId
+const connections = new Map(); // ws -> clientId
+const waitingQueue = []; // clients waiting to be paired
+let clientIdCounter = 0;
 
-function processJoinRequest(wsRequester, clientId) { // ws instance, clientId string
-    if (waitingQueue.length > 0) {
-        // Try to find a room with only 1 client
-        let joinedRoom = false;
-        for (const [roomId, clients] of rooms.entries()) {
-            if (clients.size === 1) {
-              clients.add(wsRequester);
-              clientRooms.set(clientId, roomId);
-
-              wsRequester.send(JSON.stringify({
-                  type: 'ROOM_READY',
-                  roomId,
-                  message: 'Partner found. Request the problem now.'
-                }));
-
-              console.log(`Paired ${clientId} into existing room ${roomId}.`);
-              joinedRoom = true;
-              break;
-            }
-        }
-        if (!joinedRoom) {
-            // No available room, create a new one and wait for a partner
-            const roomId = `room-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            const newRoom = new Set([wsRequester]);
-            rooms.set(roomId, newRoom);
-            clientRooms.set(clientId, roomId);
-            wsRequester.send(JSON.stringify({
-                  type: 'ROOM_READY',
-                  roomId,
-                  message: 'Partner found. Request the problem now.'
-                }));
-            console.log(`Created new room ${roomId} for ${clientId}.`);
-        }
-    }
+// Pairing logic
+function makeRoom(wsA, wsB) {
+  const roomId = `room-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  rooms.set(roomId, { clients: new Set([wsA, wsB]), problem: null });
+  const idA = connections.get(wsA);
+  const idB = connections.get(wsB);
+  clientRooms.set(idA, roomId);
+  clientRooms.set(idB, roomId);
+  const payload = JSON.stringify({ type: 'ROOM_READY', roomId, message: 'Partner found' });
+  try { wsA.send(payload); } catch {}
+  try { wsB.send(payload); } catch {}
 }
 
-function processLeaveRequest(wsLeaver, clientId) {
-    const roomId = clientRooms.get(clientId);
-    if (roomId) {
-        const room = rooms.get(roomId);
-        if (room) {
-            room.delete(wsLeaver);
-        }
-    }
+function handleJoin(ws, clientId) {
+  // drop dead sockets from queue
+  while (waitingQueue.length && waitingQueue[0].readyState !== WebSocket.OPEN) {
+    waitingQueue.shift();
+  }
+  if (waitingQueue.length > 0) {
+    const partner = waitingQueue.shift();
+    makeRoom(ws, partner);
+  } else {
+    waitingQueue.push(ws);
+    ws.send(JSON.stringify({ type: 'WAITING', message: 'Waiting for a partner...' }));
+  }
 }
 
-function handleRequestQuestion(ws, message, messageData) {
+function handleRequestQuestion(ws, msg) {
   const clientId = connections.get(ws);
   const roomId = clientRooms.get(clientId);
-
   if (!roomId) {
-    ws.send(JSON.stringify({ type: "ERROR", message: "You are not in a room" }));
+    ws.send(JSON.stringify({ type: 'ERROR', message: 'You are not in a room' }));
     return;
   }
-
-  // if the room does not have a question id assigned yet, assign one now
-  if (!rooms.get(roomId).problem) {
-    const { id, language } = message.data || {};
-    const problem = getProblemDetails(id, language);
-    rooms.get(roomId).problem = problem;
-    response = { type: "QUESTION_DETAILS", success: true, data: problem };
-
-  } else {
-    response = { type: "QUESTION_DETAILS", success: true, data: rooms.get(roomId).problem };
+  const room = rooms.get(roomId);
+  if (!room) {
+    ws.send(JSON.stringify({ type: 'ERROR', message: 'Room not found' }));
+    return;
   }
-
-  ws.send(JSON.stringify(response));
+  if (!room.problem) {
+    const id = msg.data?.id ?? null;
+    const language = msg.data?.language ?? null;
+    room.problem = getProblemDetails(id, language); // ensure this returns { id, language, content, ... }
+  }
+  ws.send(JSON.stringify({ type: 'QUESTION_DETAILS', success: true, data: room.problem }));
 }
 
-const wss = new WebSocketServer({ noServer: true });
-const host = process.env.HOST || "localhost";
-const port = number.parseInt(process.env.PORT || "1234");
+function cleanupClient(ws) {
+  const clientId = connections.get(ws);
+  connections.delete(ws);
+  const idx = waitingQueue.indexOf(ws);
+  if (idx >= 0) waitingQueue.splice(idx, 1);
+  if (clientId) {
+    const roomId = clientRooms.get(clientId);
+    if (roomId) {
+      clientRooms.delete(clientId);
+      const room = rooms.get(roomId);
+      if (room) {
+        room.clients.delete(ws);
+        if (room.clients.size === 0) rooms.delete(roomId);
+      }
+    }
+  }
+}
 
-const server = http.createServer((_request, response) => {
-  response.writeHead(200, { "Content-Type": "text/plain" });
-  response.end("okay");
+// WebSocket servers
+const yjsWSS = new WebSocketServer({ noServer: true });    // binary (Yjs)
+yjsWSS.on('connection', (ws, req, opts) => setupWSConnection(ws, req, opts));
+
+const signalWSS = new WebSocketServer({ noServer: true }); // JSON signaling
+signalWSS.on('connection', (ws) => {
+  const clientId = `client-${++clientIdCounter}`;
+  connections.set(ws, clientId);
+
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch {
+      ws.send(JSON.stringify({ type: 'ERROR', message: 'Invalid JSON' }));
+      return;
+    }
+    switch (msg.type) {
+      case 'JOIN':
+        handleJoin(ws, clientId);
+        break;
+      case 'REQUEST_QUESTION':
+        handleRequestQuestion(ws, msg);
+        break;
+      default:
+        ws.send(JSON.stringify({ type: 'ERROR', message: `Unknown type: ${msg.type}` }));
+    }
+  });
+
+  ws.on('close', () => cleanupClient(ws));
+  ws.on('error', () => cleanupClient(ws));
 });
 
-wss.on("connection", setupWSConnection);
+// HTTP + Upgrade
+const host = process.env.HOST || 'localhost';
+const port = number.parseInt(process.env.PORT || '1234');
 
-server.on("upgrade", (request, socket, head) => {
-  // You may check auth of request here..
-  // Call `wss.HandleUpgrade` *after* you checked whether the client has access
-  // (e.g. by checking cookies, or url parameters).
-  // See https://github.com/websockets/ws#client-authentication
-  wss.handleUpgrade(
-    request,
-    socket,
-    head,
-    /** @param {any} ws */ (ws) => {
-      wss.emit("connection", ws, request);
-    }
-  );
+const server = http.createServer((_req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('okay');
 });
 
-server.on("message", (msg) => {
-  try {
-    // getProblemDetails {"type": "REQUEST_QUESTION", "data": {"id": 1, "language": "javascript"}}'
-    const message = JSON.parse(msg.toString());
-    const clientId = connections.get(server);
+server.on('upgrade', (request, socket, head) => {
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const pathname = url.pathname;
 
-    if (message.type === "JOIN") {
-        processJoinRequest(server, clientId); // handles both client waiting and pairing messaging
-    }
-
-    if (message.type === "LEAVE") {
-        processLeaveRequest(server, clientId);
-    }
-
-    if (message.type === "REQUEST_QUESTION") {
-      handleRequestQuestion(server, message, message.data || {});
-    }
-
-  } catch (error) {
-    console.error("Error handling message:", error);
+  if (pathname.startsWith('/yjs/')) {
+    const roomId = pathname.replace('/yjs/', '') || 'default';
+    yjsWSS.handleUpgrade(request, socket, head, (ws) => {
+      // Pass docName so Yjs uses the roomId as the doc
+      yjsWSS.emit('connection', ws, request, { docName: roomId, gc: true });
+    });
+  } else if (pathname === '/yjs') {
+    // allow ws://host:port/yjs?roomId=...
+    const roomId = url.searchParams.get('roomId') || 'default';
+    yjsWSS.handleUpgrade(request, socket, head, (ws) => {
+      yjsWSS.emit('connection', ws, request, { docName: roomId, gc: true });
+    });
+  } else if (pathname === '/signal') {
+    signalWSS.handleUpgrade(request, socket, head, (ws) => {
+      signalWSS.emit('connection', ws, request);
+    });
+  } else {
+    socket.destroy();
   }
 });
 

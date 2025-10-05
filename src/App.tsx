@@ -1,16 +1,20 @@
-import Homepage from "./components/Homepage";
-import CodeEditor from "./components/CodeEditor";
-import { BrowserRouter as Router, Route, Routes, BrowserRouter } from "react-router-dom";
+import { ChakraProvider } from '@chakra-ui/react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { SignalWSProvider } from './context/SignalWSProvider';
+import HomePage from './components/Homepage';
+import CodeEditor from './components/CodeEditor';
 
-function App() {
+export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Homepage />} />
-        <Route path="/editor" element={<CodeEditor />} />
-      </Routes>
-    </BrowserRouter>
+    <ChakraProvider>
+      <SignalWSProvider url="ws://localhost:1234/signal">
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/editor" element={<CodeEditor />} />
+          </Routes>
+        </BrowserRouter>
+      </SignalWSProvider>
+    </ChakraProvider>
   );
 }
-
-export default App;
