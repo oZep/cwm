@@ -8,35 +8,50 @@ import {
   Fade,
   ScaleFade,
   SlideFade,
-  Text
+  Text,
+  Button,
+  Badge,
+  useToast,
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import { useSignalWS } from "../context/SignalWSProvider";
-import LanguageSelector from "./LanguageSelector";
+import LanguageSelector from "../components/LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
-import Output from "./Output";
-import QuestionBox from "./QuestionBox";
-import { RealTimeMonaco } from "./RealTimeMonaco";
+import Output from "../components/Output";
+import QuestionBox from "../components/QuestionBox";
+import { RealTimeMonaco } from "../components/RealTimeMonaco";
 
 const MotionBox = motion(Box);
 const MotionHStack = motion(HStack);
+
+// Hash helper for run voting
+async function sha256Hex(str: string) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const CodeEditor = () => {
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get("roomId") || "missing-room";
 
   const editorRef = useRef<{ getValue: () => string } | null>(null);
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(""); // keep, if your RealTimeMonaco ignores 'value' it's harmless
   const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
   const [isLoaded, setIsLoaded] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const [showMainContent, setShowMainContent] = useState(false);
   const [question, setQuestion] = useState<any | null>(null);
 
+  // Voting UI states
+  const [pendingLang, setPendingLang] = useState<string | null>(null);
+  const [langVoteProgress, setLangVoteProgress] = useState<{ language: string; votesFor: number; total: number } | null>(null);
+  const [runProgress, setRunProgress] = useState<{ votes: number; total: number } | null>(null);
+
+  const toast = useToast();
   const { send, on, status } = useSignalWS();
 
-  // Background gradient
   const bgGradient = useColorModeValue(
     "linear(to-br, purple.800, purple.900, blue.900)",
     "linear(to-br, purple.800, purple.900, blue.900)"
@@ -44,20 +59,14 @@ const CodeEditor = () => {
 
   useEffect(() => {
     setIsLoaded(true);
-    const timer = setTimeout(() => {
-      setShowMainContent(true);
-    }, 300);
+    const timer = setTimeout(() => setShowMainContent(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
+  // Propose a language vote instead of switching immediately
   const onSelect = (lang: keyof typeof CODE_SNIPPETS) => {
-    setLanguage(lang);
-    setValue(CODE_SNIPPETS[lang]);
-
-    // Ask server for a question variant for this language
-    if (status === "open") {
-      send({ type: "REQUEST_QUESTION", data: { language: lang } });
-    }
+    setPendingLang(lang);
+    send({ type: 'LANGUAGE_VOTE', data: { language: String(lang) } });
   };
 
   const onMount = (editor: any) => {
@@ -66,22 +75,70 @@ const CodeEditor = () => {
     setEditorMounted(true);
   };
 
-  // Subscribe to question updates and request on load
+  // Request question when signal WS opens and when language is committed by server
   useEffect(() => {
     if (status !== "open") return;
 
-    const offQuestion = on("QUESTION_DETAILS", (msg: any) => {
-      setQuestion(msg.data);
-    });
-
-    // Initial request (server will keep same question per room or assign once)
+    const offQuestion = on("QUESTION_DETAILS", (msg: any) => setQuestion(msg.data));
     send({ type: "REQUEST_QUESTION", data: { language } });
 
-    return () => {
-      offQuestion();
-    };
+    return () => { offQuestion(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  // Subscribe to language voting events
+  useEffect(() => {
+    if (status !== 'open') return;
+
+    const offSet = on('LANGUAGE_SET', (m: any) => {
+      const newLang = m.data.language as keyof typeof CODE_SNIPPETS;
+      // Only switch language on server-approved commit
+      setLanguage(newLang);
+      setPendingLang(null);
+      setLangVoteProgress(null);
+      // Optionally request the problem variant for this language
+      send({ type: 'REQUEST_QUESTION', data: { language: newLang } });
+      toast({ status: 'success', title: `Language set to ${newLang}` });
+    });
+
+    const offProgress = on('LANGUAGE_VOTE_PROGRESS', (m: any) => {
+      setLangVoteProgress(m.data);
+    });
+
+    const offRejected = on('LANGUAGE_VOTE_REJECTED', (m: any) => {
+      setPendingLang(null);
+      const until = m.data?.until ? ` (until ${new Date(m.data.until).toLocaleTimeString()})` : '';
+      toast({ status: 'info', title: 'Language change locked', description: `Current: ${m.data?.current}${until}` });
+    });
+
+    return () => { offSet(); offProgress(); offRejected(); };
+  }, [status, on, send, toast]);
+
+  // Subscribe to run voting events
+  useEffect(() => {
+    if (status !== 'open') return;
+
+    const offProg = on('RUN_PROGRESS', (m: any) => setRunProgress(m.data));
+    const offConflict = on('RUN_CONFLICT', (m: any) => {
+      setRunProgress(null);
+      toast({ status: 'warning', title: 'Run mismatch', description: m.data.reason.replace('_', ' ') });
+    });
+    const offApproved = on('RUN_APPROVED', async (m: any) => {
+      setRunProgress(null);
+      toast({ status: 'success', title: 'Run approved', description: `runId: ${m.data.runId}` });
+      // Trigger your real execution (server or client). If Output handles run itself,
+      // you can toggle state here to notify Output to execute once.
+    });
+
+    return () => { offProg(); offConflict(); offApproved(); };
+  }, [status, on, toast]);
+
+  const handleRunClick = async () => {
+    if (!editorRef.current) return;
+    const code = editorRef.current.getValue();
+    const hash = await sha256Hex(code);
+    send({ type: 'RUN_REQUEST', data: { language: String(language), codeHash: hash } });
+  };
 
   return (
     <MotionBox
@@ -150,11 +207,21 @@ const CodeEditor = () => {
               whileHover={{ scale: 1.002 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
-              <ScaleFade in={isLoaded} initialScale={0.95}>
-                <Box mb={3}>
+              {/* Top bar with language and run voting UI */}
+              <HStack justify="space-between" mb={3}>
+                <Box>
                   <LanguageSelector language={language} onSelect={onSelect} />
+                  {pendingLang && <Badge ml={2} colorScheme="purple">Voted: {pendingLang}</Badge>}
+                  {langVoteProgress && (
+                    <Badge ml={2} colorScheme="pink">
+                      {langVoteProgress.language}: {langVoteProgress.votesFor}/{langVoteProgress.total}
+                    </Badge>
+                  )}
                 </Box>
-              </ScaleFade>
+                <Button colorScheme="green" onClick={handleRunClick}>
+                  Run {runProgress ? `(${runProgress.votes}/${runProgress.total})` : ''}
+                </Button>
+              </HStack>
 
               <MotionBox
                 borderColor="pink.100"
@@ -207,7 +274,6 @@ const CodeEditor = () => {
                       onMount={onMount}
                       value={value}
                       height="75vh"
-                      // Yjs provider websocket (same Node server, different path)
                       WebsocketURL="ws://localhost:1234/yjs"
                       roomId={roomId}
                       color="#ff0000"

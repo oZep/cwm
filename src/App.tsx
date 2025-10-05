@@ -1,3 +1,5 @@
+'use client';
+
 import { ChakraProvider } from '@chakra-ui/react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SignalWSProvider } from './context/SignalWSProvider';

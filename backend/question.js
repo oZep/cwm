@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const problemsFilePath = path.join(__dirname, 'leetcode-train.jsonl');
 let allProblems = [];
 
-// Load JSONL (one JSON per line), skip invalid lines gracefully
+// Load JSONL safely
 try {
   const raw = fs.readFileSync(problemsFilePath, 'utf8');
   const lines = raw.split(/\r?\n/).filter(Boolean);
@@ -35,7 +35,6 @@ try {
 export function getProblemDetails(id = null, language = null) {
   if (!allProblems.length) return null;
 
-  // Pick by id or random
   const numericId = id != null ? Number(id) : null;
   let problem;
   if (numericId != null && !Number.isNaN(numericId)) {
@@ -53,9 +52,8 @@ export function getProblemDetails(id = null, language = null) {
     code: null,
   };
 
-  // If a language is requested, try to find language-specific starter code
   if (language) {
-    const langCode =
+    const lang =
       (problem.code && problem.code[language]) ||
       (problem.codes && problem.codes[language]) ||
       (problem.snippets && problem.snippets[language]) ||
@@ -63,8 +61,8 @@ export function getProblemDetails(id = null, language = null) {
       (problem.starters && problem.starters[language]) ||
       problem[language];
 
-    if (langCode) {
-      result.code = langCode;
+    if (lang) {
+      result.code = lang;
     } else {
       result.code = {
         error: `Starter code in '${language}' not available for problem ID: ${result.id}.`,

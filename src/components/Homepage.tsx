@@ -21,7 +21,6 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSignalWS } from '../context/SignalWSProvider';
 
-// Motion-enabled components
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
 const MotionImage = motion(Image);
@@ -32,7 +31,6 @@ export default function HomePage() {
   const { scrollYProgress } = useScroll();
   const background = useTransform(scrollYProgress, [0, 0.5, 1], ['#322659', '#2C244A', '#171923']);
 
-  // Hearts animation positions are stable across renders
   const floatingHearts = useMemo(
     () =>
       Array.from({ length: 15 }).map((_, i) => ({
@@ -95,7 +93,6 @@ export default function HomePage() {
       position="relative"
       overflow="hidden"
     >
-      {/* Floating hearts background */}
       {floatingHearts.map((heart) => (
         <MotionBox
           key={heart.id}
@@ -126,7 +123,6 @@ export default function HomePage() {
           spacing={{ base: 8, md: 10 }}
           py={{ base: 20, md: 28 }}
         >
-          {/* Title */}
           <MotionHeading
             fontWeight={600}
             fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
@@ -222,7 +218,6 @@ export default function HomePage() {
             </motion.div>
           </Stack>
 
-          {/* Illustration */}
           <MotionImage
             src="/girl.png"
             alt="Illustration"
@@ -238,7 +233,6 @@ export default function HomePage() {
           />
         </Stack>
 
-        {/* Mission Section */}
         <Box py={16}>
           <Stack spacing={4} as={Container} maxW="3xl" textAlign="center">
             <MotionHeading
@@ -275,7 +269,6 @@ export default function HomePage() {
             </MotionText>
           </Stack>
 
-          {/* Testimonials */}
           <Container maxW="5xl" mt={20}>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={10}>
               {[
@@ -333,17 +326,10 @@ export default function HomePage() {
                     transition: 'left 0.5s',
                   }}
                   _hover={{
-                    _before: {
-                      left: '100%',
-                    },
+                    _before: { left: '100%' },
                   }}
                 >
-                  <CardBody
-                    display="flex"
-                    flexDirection="column"
-                    justifyContent="space-between"
-                    p={8}
-                  >
+                  <CardBody display="flex" flexDirection="column" justifyContent="space-between" p={8}>
                     <Box>
                       <motion.div
                         animate={{ rotate: [0, -10, 10, -10, 0], scale: [1, 1.1, 1] }}
@@ -351,13 +337,7 @@ export default function HomePage() {
                       >
                         <Icon as={FaQuoteLeft} w={10} h={10} color="pink.400" mb={6} />
                       </motion.div>
-                      <Text
-                        fontWeight={500}
-                        fontSize="xl"
-                        fontStyle="italic"
-                        lineHeight="1.7"
-                        mb={8}
-                      >
+                      <Text fontWeight={500} fontSize="xl" fontStyle="italic" lineHeight="1.7" mb={8}>
                         {testimonial.quote}
                         <Text as="span" fontWeight="bold">
                           {testimonial.highlight}
