@@ -19,7 +19,7 @@ interface LanguageSelectorProps {
 
 const LanguageSelector = ({ language, onSelect }: LanguageSelectorProps) => {
   return (
-    <Box mb={4}>
+    <Box>
       <Menu isLazy>
         <MenuButton as={Button} borderColor={"blue.100"} color={"blue.100"} backgroundColor={"blue.900"} _hover={{ background: "blue.600" }} borderWidth={1}>{language}</MenuButton>
         <MenuList bg="purple.900">

@@ -226,7 +226,7 @@ const CodeEditor = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
               {/* Top bar: language voting + submit voting UI */}
-              <HStack justify="space-between" mb={3}>
+              <HStack justify="space-between" mb={2} pt={2}>
                 <Box>
                   <LanguageSelector language={displayLanguage} onSelect={onSelect} />
                   {pendingLang && <Badge ml={2} colorScheme="purple">Voted: {pendingLang}</Badge>}
@@ -239,7 +239,14 @@ const CodeEditor = () => {
                     <Badge ml={2} colorScheme="yellow">Preview</Badge>
                   )}
                 </Box>
-                <Button colorScheme="green" onClick={handleSubmitClick} isDisabled={isEvaluating}>
+                <Button 
+                  colorScheme="green" 
+                  onClick={handleSubmitClick} 
+                  isDisabled={isEvaluating}
+                  variant="outline"
+                  background={"green.900"}
+                  _hover={{ background: "green.600" }}
+                >
                   {isEvaluating ? <Spinner size="sm" mr={2} /> : null}
                   Submit {submitProgress ? `(${submitProgress.votes}/${submitProgress.total})` : ''}
                 </Button>

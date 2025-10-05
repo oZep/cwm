@@ -45,7 +45,7 @@ const Output = ({ editorRef, language }: OutputProps) => {
       flexDirection="column"
       borderRadius={8}
     >
-      <HStack p={2} justifyContent="space-between">
+      <HStack pb={2} pt={2} justifyContent="space-between">
         <Button
           variant="outline"
           colorScheme="green"
