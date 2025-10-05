@@ -154,7 +154,7 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
-            Stop struggling alone.
+            Stop struggling alone. <b>Start Coding Together.</b>
           </MotionText>
 
           <MotionText
