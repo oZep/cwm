@@ -1,12 +1,13 @@
-// From https://github.com/shauryag2002/real-time-monaco/blob/2a559ce1d69f9649053fd50b58b275139257a398/src/components/RealTimeMonaco/RealTimeMonaco.tsx
-import { useCallback, useEffect, useRef, FunctionComponent } from "react";
+// Simplified and cleaned up RealTimeMonaco with proper cleanup to avoid ghost cursors
+"use client";
+
+import React, { useCallback, useEffect, useRef, FunctionComponent } from "react";
 import MonacoEditor, { EditorProps as MonacoEditorProps } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { editor } from "monaco-editor";
 import * as monaco from "monaco-editor";
-import React from "react";
 
 export interface UsersType {
   cursor: {
@@ -29,7 +30,6 @@ export interface UsersType {
   };
 }
 
-// Simplified version that relies on y-monaco's default cursor handling
 export const RealTimeMonaco: FunctionComponent<
   MonacoEditorProps & {
     WebsocketURL: string;
@@ -47,39 +47,44 @@ export const RealTimeMonaco: FunctionComponent<
     (ed: editor.IStandaloneCodeEditor) => {
       editorRef.current = ed;
 
-      // Initialize Yjs
+      // Initialize Yjs + WebSocket provider
       const doc = new Y.Doc();
       const provider = new WebsocketProvider(WebsocketURL, roomId, doc);
       const type = doc.getText("monaco");
 
-      // Save refs for cleanup
       docRef.current = doc;
       providerRef.current = provider;
 
-      // Set user info in awareness
+      // Set local user info in awareness
       provider.awareness.setLocalStateField("user", {
         name,
         color,
       });
 
-      // Create Monaco binding with awareness
+      // Bind Monaco model <-> Y.Text with awareness for cursors
       const model = ed.getModel();
       if (model) {
         bindingRef.current = new MonacoBinding(
           type,
           model,
           new Set([ed]),
-          provider.awareness // important for cursor sharing
+          provider.awareness
         );
+
+        // One-time cleanup in case "undefined" was persisted
+        const BAD = "undefined";
+        const current = model.getValue();
+        if (current && current.endsWith(BAD)) {
+          model.setValue(current.slice(0, -BAD.length));
+        }
       }
 
-      // Call the original onMount if provided
       if (onMount) onMount(ed, monaco);
     },
     [WebsocketURL, roomId, name, color, onMount]
   );
 
-  // Keep awareness user info in sync if name/color props change
+  // Keep awareness user info updated if name/color change
   useEffect(() => {
     const provider = providerRef.current;
     if (provider) {
@@ -87,7 +92,7 @@ export const RealTimeMonaco: FunctionComponent<
     }
   }, [name, color]);
 
-  // Destroy provider/doc on unmount to avoid ghost cursors
+  // Cleanup on unmount to prevent ghost cursors
   useEffect(() => {
     return () => {
       const provider = providerRef.current;
@@ -95,8 +100,7 @@ export const RealTimeMonaco: FunctionComponent<
 
       if (provider) {
         try {
-          // Tell others we left so presence disappears immediately
-          provider.awareness.setLocalState(null);
+          provider.awareness.setLocalState(null); // announce leave
         } catch {}
         try {
           provider.disconnect();

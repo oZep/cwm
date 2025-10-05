@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import http from 'http';
-import fs from 'node:fs';
-import path from "node:path"
 import { WebSocketServer, WebSocket } from 'ws';
 import * as number from 'lib0/number';
 import { setupWSConnection } from './utils.js';
@@ -14,14 +12,14 @@ import {
 } from './question.js';
 
 // ----- In-memory state -----
-const rooms = new Map(); // roomId -> { clients:Set<WebSocket>, problem:any|null, language:string, languageVotes:Map<clientId,string>, submitVotes:Map<clientId,{hash,language,code,ts}>, languageLockUntil:number }
-const clientRooms = new Map(); // clientId -> roomId
-const connections = new Map(); // ws -> clientId
-const waitingQueue = []; // ws[]
+const rooms = new Map();
+const clientRooms = new Map();
+const connections = new Map();
+const waitingQueue = [];
 let clientIdCounter = 0;
 
 // Config
-const ALLOWED_LANGS = new Set(['javascript', 'python']); // extend as you implement harnesses
+const ALLOWED_LANGS = new Set(['javascript', 'python']);
 const LANGUAGE_LOCK_MS = 10000;
 const SUBMIT_VOTE_WINDOW_MS = 20000;
 
@@ -92,7 +90,6 @@ function makeRoom(wsA, wsB) {
 }
 
 function handleJoin(ws) {
-  // Drop dead sockets from queue
   while (waitingQueue.length && waitingQueue[0].readyState !== WebSocket.OPEN) {
     waitingQueue.shift();
   }
@@ -120,7 +117,7 @@ function handleRequestQuestion(ws, msg) {
   ws.send(JSON.stringify({ type: 'QUESTION_DETAILS', success: true, data: room.problem }));
 }
 
-// ----- Language voting (2/2 consensus) -----
+// ----- Language voting -----
 function handleLanguageVote(ws, msg) {
   const clientId = connections.get(ws);
   const roomId = clientRooms.get(clientId);
@@ -169,7 +166,6 @@ function handleLanguageVote(ws, msg) {
         data: { language: agreedLang, lockMs: LANGUAGE_LOCK_MS },
       });
     }
-    // Optional: else you could clear votes and broadcast a conflict, but not required
   }
 }
 
@@ -216,16 +212,14 @@ async function handleSubmitRequest(ws, msg) {
           reason: !sameLang ? 'LANGUAGE_MISMATCH' : 'HASH_MISMATCH',
         },
       });
-      // Reset the vote round so users don’t get stuck comparing against stale votes
       room.submitVotes.clear();
       return;
     }
 
-    // Both agreed: evaluate
     broadcastRoom(room, { type: 'SUBMIT_STARTED', data: {} });
 
     try {
-      const chosen = values[0]; // both are identical by hash; take first
+      const chosen = values[0];
       const problemRaw = getProblemRaw(room.problem.id);
       if (!problemRaw) throw new Error('Problem not found for evaluation');
 
@@ -318,7 +312,6 @@ async function runOnPiston(language, program) {
 }
 
 function lastJsonFromStdout(stdout) {
-  // Pick the last well-formed JSON on stdout
   const lines = String(stdout || '').split(/\r?\n/).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
@@ -326,7 +319,6 @@ function lastJsonFromStdout(stdout) {
       return { ok: true, value: v };
     } catch (_) {}
   }
-  // fallback: try whole buffer
   try {
     return { ok: true, value: JSON.parse(stdout) };
   } catch (_) {
@@ -343,7 +335,6 @@ async function evaluateSubmission(problemRaw, language, submittedCode) {
     return { ok: false, details: { reason: 'UNSUPPORTED_LANGUAGE' } };
   }
 
-  // Extract official solution and build harness
   const solutionCodeRaw = getSolutionCode(problemRaw, language);
   if (!solutionCodeRaw) {
     return { ok: false, details: { reason: 'NO_OFFICIAL_SOLUTION' } };
@@ -351,7 +342,7 @@ async function evaluateSubmission(problemRaw, language, submittedCode) {
 
   const entryName =
     getEntryName(problemRaw, language) ||
-    (problemRaw.slug === 'two-sum' ? (language === 'python' ? 'twoSum' : 'twoSum') : null); // basic fallback
+    (problemRaw.slug === 'two-sum' ? (language === 'python' ? 'twoSum' : 'twoSum') : null);
 
   if (!entryName) {
     return { ok: false, details: { reason: 'NO_ENTRY_NAME' } };
@@ -415,10 +406,10 @@ function cleanupClient(ws) {
 }
 
 // ----- WebSocket servers -----
-const yjsWSS = new WebSocketServer({ noServer: true });    // Binary Yjs protocol
+const yjsWSS = new WebSocketServer({ noServer: true });
 yjsWSS.on('connection', (ws, req, opts) => setupWSConnection(ws, req, opts));
 
-const signalWSS = new WebSocketServer({ noServer: true }); // JSON signaling
+const signalWSS = new WebSocketServer({ noServer: true });
 signalWSS.on('connection', (ws) => {
   const clientId = `client-${++clientIdCounter}`;
   connections.set(ws, clientId);
@@ -445,7 +436,7 @@ signalWSS.on('connection', (ws) => {
 
 // ----- HTTP + Upgrade routing -----
 const host = process.env.HOST || 'localhost';
-const port = number.parseInt(process.env.PORT || '10000');
+const port = number.parseInt(process.env.PORT || '1234');
 
 const server = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -475,61 +466,6 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-// this is terrible code: - Mentor
-(async () => { server.listen(port, host, () => {
+server.listen(port, host, () => {
   console.log(`running at '${host}' on port ${port}`);
-});})()
-
-const host2 = process.env.HOST || 'localhost';
-const port2 = number.parseInt(process.env.SRVPORT || '8080');
-
-http.createServer((req, res) => {
-    var filePath = '' + req.url;
-    if (filePath == '/')  {
-        filePath = '/index.html';
-    }
-
-    // SCUFF
-    filePath = "./dist" + filePath
-
-    var extname = path.extname(filePath);
-    var contentType = 'text/html';
-    switch (extname) {
-        case '.js':
-            contentType = 'text/javascript';
-            break;
-        case '.css':
-            contentType = 'text/css';
-            break;
-        case '.json':
-            contentType = 'application/json';
-            break;
-        case '.png':
-            contentType = 'image/png';
-            break;      
-        case '.jpg':
-            contentType = 'image/jpg';
-            break;
-        case '.wav':
-            contentType = 'audio/wav';
-            break;
-    }
-
-    fs.readFile(filePath, function(error, content) {
-        if (error) {
-            fs.readFile('./404.html', function(error, content) {
-                res.writeHead(200, { 'Content-Type': contentType });
-                res.end(content, 'utf-8');
-            });
-
-            return;
-        }
-
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(content, 'utf-8');
-    });
-}).listen(port2, host2, () => {
-    console.log("running CDN on port " + port2)
 });
-
-

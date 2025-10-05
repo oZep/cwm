@@ -8,6 +8,7 @@ import {
   Fade,
   ScaleFade,
   SlideFade,
+  Text,
   Button,
   Badge,
   useToast,
@@ -21,10 +22,9 @@ import { CODE_SNIPPETS } from "../constants";
 import Output from "../components/Output";
 import QuestionBox from "../components/QuestionBox";
 import { RealTimeMonaco } from "../components/RealTimeMonaco";
-import "./CodeEditor.css";
 
-const MotionBox = motion(Box);
-const MotionHStack = motion(HStack);
+const MotionBox = motion.create(Box);
+const MotionHStack = motion.create(HStack);
 
 // Hash helper for submit voting
 async function sha256Hex(str: string) {
@@ -34,6 +34,16 @@ async function sha256Hex(str: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+// Use wss in prod, ws in dev; with Vite proxy, host is fine locally
+const wsProto =
+  typeof window !== "undefined" && window.location.protocol === "https:"
+    ? "wss"
+    : "ws";
+const WS_BASE =
+  typeof window !== "undefined"
+    ? `${wsProto}://${window.location.host}`
+    : "ws://localhost:1234";
 
 // Client-side guard for languages currently enabled on the server
 const ALLOWED_LANGS = new Set(["javascript", "python"]);
@@ -210,7 +220,6 @@ const CodeEditor = () => {
         title: "Accepted ✔",
         description: m.data?.message || "",
       });
-      // Redirect both clients to homepage
       navigate("/");
     });
     const offFail = on("SUBMIT_FAIL", (m: any) => {
@@ -382,7 +391,6 @@ const CodeEditor = () => {
               >
                 <AnimatePresence mode="wait">
                   <MotionBox
-                    key={displayLanguage}
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
@@ -399,11 +407,11 @@ const CodeEditor = () => {
                         cursorSmoothCaretAnimation: "on",
                       }}
                       theme="vs-dark"
-                      language={displayLanguage} // instant preview fixes false errors
+                      language={displayLanguage} // updates syntax without remount
                       defaultValue={CODE_SNIPPETS[agreedLanguage] ?? ""} // ensure string
                       onMount={onMount}
                       height="75vh"
-                      WebsocketURL={`wss://${window.location.hostname}:10000/signal`}
+                      WebsocketURL={`${WS_BASE}/yjs`}
                       roomId={roomId}
                       color="#ff0000"
                       name="YourName"
@@ -413,7 +421,7 @@ const CodeEditor = () => {
               </MotionBox>
             </MotionBox>
 
-            {/* Right Column: Output (optional local run UI) */}
+            {/* Right Column: Output */}
             <MotionBox
               flex={1}
               display="flex"

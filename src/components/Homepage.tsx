@@ -21,11 +21,11 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSignalWS } from '../context/SignalWSProvider';
 
-const MotionBox = motion(Box);
-const MotionCard = motion(Card);
-const MotionImage = motion(Image);
-const MotionHeading = motion(Heading);
-const MotionText = motion(Text);
+const MotionBox = motion.create(Box);
+const MotionCard = motion.create(Card);
+const MotionImage = motion.create(Image);
+const MotionHeading = motion.create(Heading);
+const MotionText = motion.create(Text);
 
 export default function HomePage() {
   const { scrollYProgress } = useScroll();
@@ -157,7 +157,9 @@ export default function HomePage() {
             Stop struggling alone. <b>Start Coding Together.</b>
           </MotionText>
 
+          {/* Turn outer wrapper into a div so nested Text (p) is valid */}
           <MotionText
+            as="div"
             maxW="3xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -246,6 +248,7 @@ export default function HomePage() {
               Our Mission
             </MotionHeading>
             <MotionText
+              as="div"
               color="gray.300"
               fontSize={{ base: 'lg', sm: 'xl' }}
               initial={{ opacity: 0, x: 50 }}
@@ -253,18 +256,20 @@ export default function HomePage() {
               viewport={{ once: true }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              To democratize coding education by fostering a{' '}
-              <Text as="span" fontWeight="bold" color="pink.400">
-                supportive, one-on-one community
-              </Text>{' '}
-              where anyone can learn, grow, and build the future, together. We believe the best way
-              to learn is by{' '}
-              <Text as="span" fontWeight="bold" color="pink.400">
-                doing
-              </Text>
-              —and the best way to do it is with a{' '}
-              <Text as="span" fontWeight="bold" color="pink.400">
-                mentor by your side.
+              <Text>
+                To democratize coding education by fostering a{' '}
+                <Text as="span" fontWeight="bold" color="pink.400">
+                  supportive, one-on-one community
+                </Text>{' '}
+                where anyone can learn, grow, and build the future, together. We believe the best way
+                to learn is by{' '}
+                <Text as="span" fontWeight="bold" color="pink.400">
+                  doing
+                </Text>
+                —and the best way to do it is with a{' '}
+                <Text as="span" fontWeight="bold" color="pink.400">
+                  mentor by your side.
+                </Text>
               </Text>
             </MotionText>
           </Stack>
