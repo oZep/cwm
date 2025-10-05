@@ -1,15 +1,13 @@
 // From https://github.com/shauryag2002/real-time-monaco/blob/2a559ce1d69f9649053fd50b58b275139257a398/src/components/RealTimeMonaco/RealTimeMonaco.tsx
-import { useCallback } from "react";
-import MonacoEditor from "@monaco-editor/react";
+import { useCallback, useEffect, useRef, FunctionComponent } from "react";
+import MonacoEditor, { EditorProps as MonacoEditorProps } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { editor } from "monaco-editor";
-import { useRef } from "react";
-import { FunctionComponent } from "react";
-import { EditorProps as MonacoEditorProps } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import React from "react";
+
 export interface UsersType {
   cursor: {
     column?: number;
@@ -41,42 +39,82 @@ export const RealTimeMonaco: FunctionComponent<
   }
 > = ({ WebsocketURL, roomId, name, color, onMount, ...props }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor>();
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const docRef = useRef<Y.Doc | null>(null);
+  const bindingRef = useRef<MonacoBinding | null>(null);
 
   const handleEditorDidMount = useCallback(
-    (editor: editor.IStandaloneCodeEditor) => {
-      editorRef.current = editor;
+    (ed: editor.IStandaloneCodeEditor) => {
+      editorRef.current = ed;
 
       // Initialize Yjs
       const doc = new Y.Doc();
       const provider = new WebsocketProvider(WebsocketURL, roomId, doc);
       const type = doc.getText("monaco");
 
+      // Save refs for cleanup
+      docRef.current = doc;
+      providerRef.current = provider;
+
       // Set user info in awareness
       provider.awareness.setLocalStateField("user", {
-        name: name,
-        color: color,
+        name,
+        color,
       });
 
       // Create Monaco binding with awareness
-      const model = editor.getModel();
+      const model = ed.getModel();
       if (model) {
-        new MonacoBinding(
+        bindingRef.current = new MonacoBinding(
           type,
           model,
-          new Set([editor]),
-          provider.awareness // This is important for cursor sharing!
+          new Set([ed]),
+          provider.awareness // important for cursor sharing
         );
       }
 
       // Call the original onMount if provided
-      if (onMount) {
-        onMount(editor, monaco);
-      }
+      if (onMount) onMount(ed, monaco);
     },
     [WebsocketURL, roomId, name, color, onMount]
   );
 
-  return (
-    <MonacoEditor theme="vs-dark" onMount={handleEditorDidMount} {...props} />
-  );
+  // Keep awareness user info in sync if name/color props change
+  useEffect(() => {
+    const provider = providerRef.current;
+    if (provider) {
+      provider.awareness.setLocalStateField("user", { name, color });
+    }
+  }, [name, color]);
+
+  // Destroy provider/doc on unmount to avoid ghost cursors
+  useEffect(() => {
+    return () => {
+      const provider = providerRef.current;
+      const doc = docRef.current;
+
+      if (provider) {
+        try {
+          // Tell others we left so presence disappears immediately
+          provider.awareness.setLocalState(null);
+        } catch {}
+        try {
+          provider.disconnect();
+        } catch {}
+        try {
+          provider.destroy();
+        } catch {}
+      }
+      if (doc) {
+        try {
+          doc.destroy();
+        } catch {}
+      }
+      providerRef.current = null;
+      docRef.current = null;
+      bindingRef.current = null;
+    };
+  }, []);
+
+  return <MonacoEditor theme="vs-dark" onMount={handleEditorDidMount} {...props} />;
 };
