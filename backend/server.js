@@ -3,19 +3,40 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as number from 'lib0/number';
 import { setupWSConnection } from './utils.js';
-import { getProblemDetails } from './question.js';
+import {
+  getProblemDetails,
+  getProblemRaw,
+  getSolutionCode,
+  getEntryName,
+  getTests
+} from './question.js';
 
 // ----- In-memory state -----
-const rooms = new Map(); // roomId -> { clients:Set<WebSocket>, problem:any|null, language:string, languageVotes:Map<clientId,string>, runVotes:Map<clientId,{hash,language,ts}>, languageLockUntil:number }
+const rooms = new Map(); // roomId -> { clients:Set<WebSocket>, problem:any|null, language:string, languageVotes:Map<clientId,string>, submitVotes:Map<clientId,{hash,language,code,ts}>, languageLockUntil:number }
 const clientRooms = new Map(); // clientId -> roomId
 const connections = new Map(); // ws -> clientId
 const waitingQueue = []; // ws[]
 let clientIdCounter = 0;
 
 // Config
-const ALLOWED_LANGS = new Set(['javascript', 'python', 'typescript', 'java', 'cpp']);
-const LANGUAGE_LOCK_MS = 10000; // lock after a commit to avoid rapid flips
-const RUN_VOTE_WINDOW_MS = 15000; // both need to vote within this window
+const ALLOWED_LANGS = new Set(['javascript', 'python']); // extend as you implement harnesses
+const LANGUAGE_LOCK_MS = 10000;
+const SUBMIT_VOTE_WINDOW_MS = 20000;
+
+// Piston config
+const PISTON_URL = process.env.PISTON_URL || 'https://emkc.org/api/v2/piston';
+const PISTON = {
+  javascript: {
+    language: 'javascript',
+    version: process.env.PISTON_JS_VERSION || '18.15.0',
+    filename: 'main.js'
+  },
+  python: {
+    language: 'python',
+    version: process.env.PISTON_PY_VERSION || '3.10.0',
+    filename: 'main.py'
+  }
+};
 
 // ----- Helpers -----
 function sanitizeLang(lang) {
@@ -45,7 +66,7 @@ function makeRoom(wsA, wsB) {
     problem: null,
     language: 'javascript',
     languageVotes: new Map(),
-    runVotes: new Map(),
+    submitVotes: new Map(),
     languageLockUntil: 0,
   });
   const idA = connections.get(wsA);
@@ -120,7 +141,6 @@ function handleLanguageVote(ws, msg) {
     data: { language: proposed, votesFor, total: room.clients.size },
   });
 
-  // Require both clients to vote and agree
   if (room.clients.size >= 2 && room.languageVotes.size === room.clients.size) {
     const unique = new Set(room.languageVotes.values());
     if (unique.size === 1) {
@@ -136,8 +156,8 @@ function handleLanguageVote(ws, msg) {
   }
 }
 
-// ----- Run voting (2/2 same hash + language) -----
-function handleRunRequest(ws, msg) {
+// ----- Submit voting (2/2 same hash + language) -----
+async function handleSubmitRequest(ws, msg) {
   const clientId = connections.get(ws);
   const roomId = clientRooms.get(clientId);
   const room = rooms.get(roomId);
@@ -145,47 +165,217 @@ function handleRunRequest(ws, msg) {
     ws.send(JSON.stringify({ type: 'ERROR', message: 'You are not in a room' }));
     return;
   }
+  if (!room.problem) {
+    ws.send(JSON.stringify({ type: 'ERROR', message: 'No problem set for this room yet' }));
+    return;
+  }
 
   const now = Date.now();
   const lang = sanitizeLang(msg?.data?.language) || room.language;
   const codeHash = String(msg?.data?.codeHash || '');
+  const code = String(msg?.data?.code || '');
 
   // prune stale votes
-  for (const [cid, info] of room.runVotes.entries()) {
-    if (now - info.ts > RUN_VOTE_WINDOW_MS) room.runVotes.delete(cid);
+  for (const [cid, info] of room.submitVotes.entries()) {
+    if (now - info.ts > SUBMIT_VOTE_WINDOW_MS) room.submitVotes.delete(cid);
   }
 
-  room.runVotes.set(clientId, { hash: codeHash, language: lang, ts: now });
+  room.submitVotes.set(clientId, { hash: codeHash, language: lang, code, ts: now });
 
   broadcastRoom(room, {
-    type: 'RUN_PROGRESS',
-    data: { votes: room.runVotes.size, total: room.clients.size },
+    type: 'SUBMIT_PROGRESS',
+    data: { votes: room.submitVotes.size, total: room.clients.size },
   });
 
-  if (room.runVotes.size === room.clients.size) {
-    const values = Array.from(room.runVotes.values());
+  if (room.submitVotes.size === room.clients.size) {
+    const values = Array.from(room.submitVotes.values());
     const sameLang = values.every((v) => v.language === values[0].language);
     const sameHash = values.every((v) => v.hash === values[0].hash);
 
-    if (sameLang && sameHash) {
-      const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    if (!sameLang || !sameHash) {
       broadcastRoom(room, {
-        type: 'RUN_APPROVED',
-        data: { runId, language: values[0].language, codeHash: values[0].hash },
-      });
-      room.runVotes.clear();
-    } else {
-      broadcastRoom(room, {
-        type: 'RUN_CONFLICT',
+        type: 'SUBMIT_CONFLICT',
         data: {
           reason: !sameLang ? 'LANGUAGE_MISMATCH' : 'HASH_MISMATCH',
-          requested: values,
         },
       });
+      return;
+    }
+
+    // Both agreed: evaluate
+    broadcastRoom(room, { type: 'SUBMIT_STARTED', data: {} });
+
+    try {
+      const chosen = values[0]; // both are identical by hash; take first
+      const problemRaw = getProblemRaw(room.problem.id);
+      if (!problemRaw) throw new Error('Problem not found for evaluation');
+
+      const evalResult = await evaluateSubmission(problemRaw, chosen.language, chosen.code);
+      if (evalResult.ok) {
+        broadcastRoom(room, {
+          type: 'SUBMIT_SUCCESS',
+          data: { message: 'Outputs matched on all tests' },
+        });
+      } else {
+        broadcastRoom(room, {
+          type: 'SUBMIT_FAIL',
+          data: {
+            message: 'Outputs did not match or runtime error',
+            details: evalResult.details || null,
+          },
+        });
+      }
+    } catch (e) {
+      broadcastRoom(room, {
+        type: 'SUBMIT_FAIL',
+        data: { message: 'Evaluation error', error: String(e?.message || e) },
+      });
+    } finally {
+      room.submitVotes.clear();
     }
   }
 }
 
+// ----- Evaluation via Piston -----
+function composeProgram(language, baseCode, entryName, tests) {
+  if (language === 'javascript') {
+    const testsJson = JSON.stringify(tests);
+    return `
+${baseCode}
+
+const __tests = ${testsJson};
+const __out = __tests.map(args => ${entryName}(...args));
+console.log(JSON.stringify(__out));
+`;
+  }
+  if (language === 'python') {
+    const testsJson = JSON.stringify(tests);
+    return `
+${baseCode}
+
+import json
+__tests_json = r'''${testsJson}'''
+__tests = json.loads(__tests_json)
+__out = []
+for args in __tests:
+    res = ${entryName}(*args)
+    __out.append(res)
+print(json.dumps(__out))
+`;
+  }
+  throw new Error(`Unsupported language for composeProgram: ${language}`);
+}
+
+async function runOnPiston(language, program) {
+  const cfg = PISTON[language];
+  if (!cfg) throw new Error(`Unsupported language: ${language}`);
+
+  const body = {
+    language: cfg.language,
+    version: cfg.version,
+    files: [{ name: cfg.filename, content: program }],
+    stdin: '',
+    args: [],
+    compile_timeout: 10000,
+    run_timeout: 8000,
+    run_memory_limit: 256000000,
+  };
+
+  const res = await fetch(`${PISTON_URL}/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Piston HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  const run = json.run || {};
+  return {
+    stdout: run.stdout || '',
+    stderr: run.stderr || '',
+    code: typeof run.code === 'number' ? run.code : 0,
+  };
+}
+
+function lastJsonFromStdout(stdout) {
+  // Pick the last well-formed JSON on stdout
+  const lines = String(stdout || '').split(/\r?\n/).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const v = JSON.parse(lines[i]);
+      return { ok: true, value: v };
+    } catch (_) {}
+  }
+  // fallback: try whole buffer
+  try {
+    return { ok: true, value: JSON.parse(stdout) };
+  } catch (_) {
+    return { ok: false, value: null };
+  }
+}
+
+function deepEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+async function evaluateSubmission(problemRaw, language, submittedCode) {
+  if (!ALLOWED_LANGS.has(language)) {
+    return { ok: false, details: { reason: 'UNSUPPORTED_LANGUAGE' } };
+  }
+
+  // Extract official solution and build harness
+  const solutionCodeRaw = getSolutionCode(problemRaw, language);
+  if (!solutionCodeRaw) {
+    return { ok: false, details: { reason: 'NO_OFFICIAL_SOLUTION' } };
+  }
+
+  const entryName =
+    getEntryName(problemRaw, language) ||
+    (problemRaw.slug === 'two-sum' ? (language === 'python' ? 'twoSum' : 'twoSum') : null); // basic fallback
+
+  if (!entryName) {
+    return { ok: false, details: { reason: 'NO_ENTRY_NAME' } };
+  }
+
+  const tests = getTests(problemRaw) ||
+    (problemRaw.slug === 'two-sum'
+      ? [[[2,7,11,15], 9], [[3,2,4], 6], [[3,3], 6]]
+      : null);
+
+  if (!tests || !Array.isArray(tests) || !Array.isArray(tests[0])) {
+    return { ok: false, details: { reason: 'NO_TESTS' } };
+  }
+
+  const solProgram = composeProgram(language, solutionCodeRaw, entryName, tests);
+  const subProgram = composeProgram(language, submittedCode, entryName, tests);
+
+  const [solRun, subRun] = await Promise.all([
+    runOnPiston(language, solProgram),
+    runOnPiston(language, subProgram),
+  ]);
+
+  if (solRun.code !== 0 || subRun.code !== 0) {
+    return {
+      ok: false,
+      details: { reason: 'RUNTIME_ERROR', sol: solRun, sub: subRun }
+    };
+  }
+
+  const solParsed = lastJsonFromStdout(solRun.stdout);
+  const subParsed = lastJsonFromStdout(subRun.stdout);
+  if (!solParsed.ok || !subParsed.ok) {
+    return { ok: false, details: { reason: 'INVALID_OUTPUT_JSON', sol: solRun.stdout, sub: subRun.stdout } };
+  }
+
+  const equal = deepEqual(solParsed.value, subParsed.value);
+  return {
+    ok: equal,
+    details: { sol: solParsed.value, sub: subParsed.value }
+  };
+}
+
+// ----- Cleanup -----
 function cleanupClient(ws) {
   const clientId = connections.get(ws);
   connections.delete(ws);
@@ -214,7 +404,7 @@ signalWSS.on('connection', (ws) => {
   const clientId = `client-${++clientIdCounter}`;
   connections.set(ws, clientId);
 
-  ws.on('message', (raw) => {
+  ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch {
       ws.send(JSON.stringify({ type: 'ERROR', message: 'Invalid JSON' }));
@@ -224,7 +414,7 @@ signalWSS.on('connection', (ws) => {
       case 'JOIN': handleJoin(ws); break;
       case 'REQUEST_QUESTION': handleRequestQuestion(ws, msg); break;
       case 'LANGUAGE_VOTE': handleLanguageVote(ws, msg); break;
-      case 'RUN_REQUEST': handleRunRequest(ws, msg); break;
+      case 'SUBMIT_REQUEST': await handleSubmitRequest(ws, msg); break;
       default:
         ws.send(JSON.stringify({ type: 'ERROR', message: `Unknown type: ${msg.type}` }));
     }

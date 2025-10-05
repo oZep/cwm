@@ -12,20 +12,21 @@ import {
   Button,
   Badge,
   useToast,
+  Spinner
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useSignalWS } from "../context/SignalWSProvider";
-import LanguageSelector from "./LanguageSelector";
+import LanguageSelector from "../components/LanguageSelector";
 import { CODE_SNIPPETS } from "../constants";
-import Output from "./Output";
-import QuestionBox from "./QuestionBox";
-import { RealTimeMonaco } from "./RealTimeMonaco";
+import Output from "../components/Output";
+import QuestionBox from "../components/QuestionBox";
+import { RealTimeMonaco } from "../components/RealTimeMonaco";
 
 const MotionBox = motion(Box);
 const MotionHStack = motion(HStack);
 
-// Hash helper for run voting
+// Hash helper for submit voting
 async function sha256Hex(str: string) {
   const enc = new TextEncoder().encode(str);
   const buf = await crypto.subtle.digest('SHA-256', enc);
@@ -35,24 +36,24 @@ async function sha256Hex(str: string) {
 const CodeEditor = () => {
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get("roomId") || "missing-room";
+  const navigate = useNavigate();
 
   const editorRef = useRef<{ getValue: () => string } | null>(null);
-  const [value] = useState(""); // keep if RealTimeMonaco ignores 'value' it's harmless
+  const [value] = useState(""); // harmless if RealTimeMonaco ignores 'value'
   const [isLoaded, setIsLoaded] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const [showMainContent, setShowMainContent] = useState(false);
   const [question, setQuestion] = useState<any | null>(null);
 
-  // Language states:
-  // - agreedLanguage: language committed by server after consensus
-  // - displayLanguage: language used for Monaco syntax highlighting immediately (local preview)
+  // Language states: agreed (server) vs display (local preview)
   const [agreedLanguage, setAgreedLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
   const [displayLanguage, setDisplayLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
 
   // Voting UI states
   const [pendingLang, setPendingLang] = useState<string | null>(null);
   const [langVoteProgress, setLangVoteProgress] = useState<{ language: string; votesFor: number; total: number } | null>(null);
-  const [runProgress, setRunProgress] = useState<{ votes: number; total: number } | null>(null);
+  const [submitProgress, setSubmitProgress] = useState<{ votes: number; total: number } | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   const toast = useToast();
   const { send, on, status } = useSignalWS();
@@ -68,10 +69,10 @@ const CodeEditor = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Propose a language vote and preview it locally (fixes “r is undefined” in JS mode)
+  // Language vote + preview (fixes "r is undefined" false errors)
   const onSelect = (lang: keyof typeof CODE_SNIPPETS) => {
     setPendingLang(lang);
-    setDisplayLanguage(lang); // Local, immediate syntax highlighting preview
+    setDisplayLanguage(lang); // local preview
     send({ type: 'LANGUAGE_VOTE', data: { language: String(lang) } });
   };
 
@@ -81,7 +82,7 @@ const CodeEditor = () => {
     setEditorMounted(true);
   };
 
-  // Request question when signal WS opens for agreedLanguage
+  // Request question when signal WS opens and when agreed language changes
   useEffect(() => {
     if (status !== "open") return;
 
@@ -97,25 +98,21 @@ const CodeEditor = () => {
 
     const offSet = on('LANGUAGE_SET', (m: any) => {
       const newLang = m.data.language as keyof typeof CODE_SNIPPETS;
-      // Only switch the agreed language on server-approved commit
       setAgreedLanguage(newLang);
       setDisplayLanguage(newLang);
       setPendingLang(null);
       setLangVoteProgress(null);
-      // Optionally refresh the problem variant for this language
       send({ type: 'REQUEST_QUESTION', data: { language: newLang } });
       toast({ status: 'success', title: `Language set to ${newLang}` });
     });
 
     const offProgress = on('LANGUAGE_VOTE_PROGRESS', (m: any) => {
       setLangVoteProgress(m.data);
-      // Optional: follow the room’s latest proposal automatically:
-      // setDisplayLanguage(m.data.language as keyof typeof CODE_SNIPPETS);
     });
 
     const offRejected = on('LANGUAGE_VOTE_REJECTED', (m: any) => {
       setPendingLang(null);
-      setDisplayLanguage(agreedLanguage); // Revert local preview if rejected/locked
+      setDisplayLanguage(agreedLanguage); // revert preview
       const until = m.data?.until ? ` (until ${new Date(m.data.until).toLocaleTimeString()})` : '';
       toast({ status: 'info', title: 'Language change locked', description: `Current: ${m.data?.current}${until}` });
     });
@@ -123,31 +120,42 @@ const CodeEditor = () => {
     return () => { offSet(); offProgress(); offRejected(); };
   }, [status, on, send, toast, agreedLanguage]);
 
-  // Subscribe to run voting events
+  // Subscribe to submit voting events
   useEffect(() => {
     if (status !== 'open') return;
 
-    const offProg = on('RUN_PROGRESS', (m: any) => setRunProgress(m.data));
-    const offConflict = on('RUN_CONFLICT', (m: any) => {
-      setRunProgress(null);
-      toast({ status: 'warning', title: 'Run mismatch', description: m.data.reason.replace('_', ' ') });
+    const offProg = on('SUBMIT_PROGRESS', (m: any) => {
+      setSubmitProgress(m.data);
     });
-    const offApproved = on('RUN_APPROVED', async (m: any) => {
-      setRunProgress(null);
-      toast({ status: 'success', title: 'Run approved', description: `runId: ${m.data.runId}` });
-      // Trigger your real execution (server or client). If Output handles run itself,
-      // you can toggle state here to notify Output to execute once.
+    const offConflict = on('SUBMIT_CONFLICT', (m: any) => {
+      setSubmitProgress(null);
+      setIsEvaluating(false);
+      toast({ status: 'warning', title: 'Submit mismatch', description: m.data.reason.replace('_', ' ') });
+    });
+    const offStarted = on('SUBMIT_STARTED', () => {
+      setIsEvaluating(true);
+    });
+    const offSuccess = on('SUBMIT_SUCCESS', (m: any) => {
+      setIsEvaluating(false);
+      setSubmitProgress(null);
+      toast({ status: 'success', title: 'Accepted ✔', description: m.data?.message || '' });
+      // Redirect both clients to homepage
+      navigate('/');
+    });
+    const offFail = on('SUBMIT_FAIL', (m: any) => {
+      setIsEvaluating(false);
+      setSubmitProgress(null);
+      toast({ status: 'error', title: 'Wrong Answer', description: m.data?.message || '' });
     });
 
-    return () => { offProg(); offConflict(); offApproved(); };
-  }, [status, on, toast]);
+    return () => { offProg(); offConflict(); offStarted(); offSuccess(); offFail(); };
+  }, [status, on, toast, navigate]);
 
-  const handleRunClick = async () => {
+  const handleSubmitClick = async () => {
     if (!editorRef.current) return;
     const code = editorRef.current.getValue();
     const hash = await sha256Hex(code);
-    // Vote to run with the AGREED language to keep execution consistent
-    send({ type: 'RUN_REQUEST', data: { language: String(agreedLanguage), codeHash: hash } });
+    send({ type: 'SUBMIT_REQUEST', data: { language: String(agreedLanguage), codeHash: hash, code } });
   };
 
   return (
@@ -217,7 +225,7 @@ const CodeEditor = () => {
               whileHover={{ scale: 1.002 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
-              {/* Top bar: language voting + run voting UI */}
+              {/* Top bar: language voting + submit voting UI */}
               <HStack justify="space-between" mb={3}>
                 <Box>
                   <LanguageSelector language={displayLanguage} onSelect={onSelect} />
@@ -231,8 +239,9 @@ const CodeEditor = () => {
                     <Badge ml={2} colorScheme="yellow">Preview</Badge>
                   )}
                 </Box>
-                <Button colorScheme="green" onClick={handleRunClick}>
-                  Run {runProgress ? `(${runProgress.votes}/${runProgress.total})` : ''}
+                <Button colorScheme="green" onClick={handleSubmitClick} isDisabled={isEvaluating}>
+                  {isEvaluating ? <Spinner size="sm" mr={2} /> : null}
+                  Submit {submitProgress ? `(${submitProgress.votes}/${submitProgress.total})` : ''}
                 </Button>
               </HStack>
 
@@ -297,7 +306,7 @@ const CodeEditor = () => {
               </MotionBox>
             </MotionBox>
 
-            {/* Right Column: Output */}
+            {/* Right Column: Output (optional local run UI) */}
             <MotionBox
               flex={1}
               display="flex"
@@ -311,7 +320,6 @@ const CodeEditor = () => {
                 initialScale={0.95}
                 style={{ display: "flex", flex: 5, flexDirection: "column" }}
               >
-                {/* Use AGREED language for execution-related UI */}
                 <Output editorRef={editorRef} language={agreedLanguage} />
               </ScaleFade>
             </MotionBox>

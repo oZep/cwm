@@ -6,7 +6,7 @@ type Outgoing =
   | { type: 'JOIN' }
   | { type: 'REQUEST_QUESTION'; data?: { id?: number | null; language?: string | null } }
   | { type: 'LANGUAGE_VOTE'; data: { language: string } }
-  | { type: 'RUN_REQUEST'; data: { language: string; codeHash: string } };
+  | { type: 'SUBMIT_REQUEST'; data: { language: string; codeHash: string; code: string } };
 
 type Incoming =
   | { type: 'WAITING'; message: string }
@@ -15,9 +15,11 @@ type Incoming =
   | { type: 'LANGUAGE_VOTE_PROGRESS'; data: { language: string; votesFor: number; total: number } }
   | { type: 'LANGUAGE_SET'; data: { language: string; lockMs: number } }
   | { type: 'LANGUAGE_VOTE_REJECTED'; data: { reason: string; until?: number; current?: string } }
-  | { type: 'RUN_PROGRESS'; data: { votes: number; total: number } }
-  | { type: 'RUN_CONFLICT'; data: { reason: string; requested: any[] } }
-  | { type: 'RUN_APPROVED'; data: { runId: string; language: string; codeHash: string } }
+  | { type: 'SUBMIT_PROGRESS'; data: { votes: number; total: number } }
+  | { type: 'SUBMIT_CONFLICT'; data: { reason: string } }
+  | { type: 'SUBMIT_STARTED'; data: {} }
+  | { type: 'SUBMIT_SUCCESS'; data: { message: string } }
+  | { type: 'SUBMIT_FAIL'; data: { message: string; error?: string; details?: any } }
   | { type: 'ERROR'; message: string };
 
 type WSStatus = 'connecting' | 'open' | 'closed' | 'error';
@@ -70,7 +72,7 @@ export function SignalWSProvider({
     () => ({
       ws: wsRef.current,
       status,
-      send: (msg: Outgoing) => {
+      send: (msg) => {
         const ws = wsRef.current;
         if (!ws || ws.readyState !== WebSocket.OPEN) return false;
         ws.send(JSON.stringify(msg));
