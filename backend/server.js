@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import http from 'http';
+import fs from 'node:fs';
+import path from "node:path"
 import { WebSocketServer, WebSocket } from 'ws';
 import * as number from 'lib0/number';
 import { setupWSConnection } from './utils.js';
@@ -473,6 +475,61 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-server.listen(port, host, () => {
+// this is terrible code: - Mentor
+(async () => { server.listen(port, host, () => {
   console.log(`running at '${host}' on port ${port}`);
+});})()
+
+const host2 = process.env.HOST || 'localhost';
+const port2 = number.parseInt(process.env.SRVPORT || '8080');
+
+http.createServer((req, res) => {
+    var filePath = '' + req.url;
+    if (filePath == '/')  {
+        filePath = '/index.html';
+    }
+
+    // SCUFF
+    filePath = "./dist" + filePath
+
+    var extname = path.extname(filePath);
+    var contentType = 'text/html';
+    switch (extname) {
+        case '.js':
+            contentType = 'text/javascript';
+            break;
+        case '.css':
+            contentType = 'text/css';
+            break;
+        case '.json':
+            contentType = 'application/json';
+            break;
+        case '.png':
+            contentType = 'image/png';
+            break;      
+        case '.jpg':
+            contentType = 'image/jpg';
+            break;
+        case '.wav':
+            contentType = 'audio/wav';
+            break;
+    }
+
+    fs.readFile(filePath, function(error, content) {
+        if (error) {
+            fs.readFile('./404.html', function(error, content) {
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(content, 'utf-8');
+            });
+
+            return;
+        }
+
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content, 'utf-8');
+    });
+}).listen(port2, host2, () => {
+    console.log("running CDN on port " + port2)
 });
+
+

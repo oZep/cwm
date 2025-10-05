@@ -9,7 +9,7 @@ import CodeEditor from './components/CodeEditor';
 export default function App() {
   return (
     <ChakraProvider>
-      <SignalWSProvider url="ws://localhost:1234/signal">
+      <SignalWSProvider url="ws://localhost:10000/signal">
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomePage />} />
