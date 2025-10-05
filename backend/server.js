@@ -445,7 +445,7 @@ signalWSS.on('connection', (ws) => {
 
 // ----- HTTP + Upgrade routing -----
 const host = process.env.HOST || 'localhost';
-const port = number.parseInt(process.env.PORT || '1234');
+const port = number.parseInt(process.env.PORT || '10000');
 
 const server = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
