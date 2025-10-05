@@ -8,46 +8,69 @@ const __dirname = path.dirname(__filename);
 const problemsFilePath = path.join(__dirname, 'leetcode-train.jsonl');
 let allProblems = [];
 
+// Load JSONL (one JSON per line), skip invalid lines gracefully
 try {
-    const data = fs.readFileSync(problemsFilePath, 'utf8');
-    // .jsonl files are newline-delimited JSON
-    allProblems = data
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => JSON.parse(line));
-    console.log(`Loaded ${allProblems.length} problems from file.`);
+  const raw = fs.readFileSync(problemsFilePath, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const parsed = [];
+  for (let i = 0; i < lines.length; i++) {
+    try {
+      parsed.push(JSON.parse(lines[i]));
+    } catch (e) {
+      console.warn(`Skipping invalid JSON on line ${i + 1}: ${e.message}`);
+    }
+  }
+  allProblems = parsed;
+  console.log(`Loaded ${allProblems.length} problems from file.`);
 } catch (err) {
-    console.error('Failed to load problems:', err);
-    process.exit(1); 
+  console.error('Failed to load problems:', err);
+  process.exit(1);
 }
 
-function getProblemDetails(id = null, language = null) {
-    // randomly select a problem or by id
-    if (id) {
-        const problem = allProblems.find(p => p.id === id);
-        if (!problem) {
-            return null;
-        }
+/**
+ * Return unified problem details with optional language-specific starter code.
+ * Tries common shapes: problem.code[lang], problem.codes[lang], problem.snippets[lang],
+ * problem.starterCode[lang], problem.starters[lang], or problem[lang].
+ */
+export function getProblemDetails(id = null, language = null) {
+  if (!allProblems.length) return null;
+
+  // Pick by id or random
+  const numericId = id != null ? Number(id) : null;
+  let problem;
+  if (numericId != null && !Number.isNaN(numericId)) {
+    problem = allProblems.find((p) => Number(p.id) === numericId);
+    if (!problem) return null;
+  } else {
+    const randomIndex = Math.floor(Math.random() * allProblems.length);
+    problem = allProblems[randomIndex];
+  }
+
+  const result = {
+    id: Number(problem.id),
+    title: problem.title ?? problem.name ?? problem.slug ?? `Problem ${problem.id}`,
+    content: problem.content ?? problem.prompt ?? problem.description ?? '',
+    code: null,
+  };
+
+  // If a language is requested, try to find language-specific starter code
+  if (language) {
+    const langCode =
+      (problem.code && problem.code[language]) ||
+      (problem.codes && problem.codes[language]) ||
+      (problem.snippets && problem.snippets[language]) ||
+      (problem.starterCode && problem.starterCode[language]) ||
+      (problem.starters && problem.starters[language]) ||
+      problem[language];
+
+    if (langCode) {
+      result.code = langCode;
     } else {
-        const randomIndex = Math.floor(Math.random() * allProblems.length);
-        id = allProblems[randomIndex].id;
+      result.code = {
+        error: `Starter code in '${language}' not available for problem ID: ${result.id}.`,
+      };
     }
-    const result = {
-        id: problem.id,
-        title: problem.title,
-        content: problem.content,
-        code: null,
-    };
+  }
 
-    if (language && problem[language]) {
-        result.code = problem.language
-    } else if (language) {
-        result.code = {
-             error: `Starter code in '${language}' not available for problem ID: ${problem.id}.`
-        };
-    }
-
-    return result;
+  return result;
 }
-
-export { getProblemDetails };
