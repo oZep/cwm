@@ -46,7 +46,7 @@ export function SignalWSProvider({
   const listenersRef = useRef<Map<string, Set<Listener>>>(new Map());
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://https://cwm.definitelynotaniplogger.com/:10000/signal`);
+    const ws = new WebSocket(`ws://https://cwm.definitelynotaniplogger.com:10000/signal`);
     wsRef.current = ws;
     setStatus('connecting');
 
