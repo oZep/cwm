@@ -10,7 +10,7 @@ import CodeEditor from './components/CodeEditor';
 const wsProto =
   typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws';
 const WS_BASE =
-  typeof window !== 'undefined' ? `${wsProto}://${window.location.host}` : 'ws://localhost:1234';
+  typeof window !== 'undefined' ? `${wsProto}://${window.location.host}` : 'ws://localhost:10000';
 
 export default function App() {
   return (

@@ -6,12 +6,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/signal': {
-        target: 'ws://localhost:1234',
+        target: 'ws://localhost:10000',
         ws: true,
         changeOrigin: true,
       },
       '/yjs': {
-        target: 'ws://localhost:1234',
+        target: 'ws://localhost:10000',
         ws: true,
         changeOrigin: true,
       },

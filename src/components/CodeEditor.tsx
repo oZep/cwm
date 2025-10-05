@@ -43,7 +43,7 @@ const wsProto =
 const WS_BASE =
   typeof window !== "undefined"
     ? `${wsProto}://${window.location.host}`
-    : "ws://localhost:1234";
+    : "ws://localhost:10000";
 
 // Client-side guard for languages currently enabled on the server
 const ALLOWED_LANGS = new Set(["javascript", "python"]);
