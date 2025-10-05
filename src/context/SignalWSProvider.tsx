@@ -35,7 +35,7 @@ type Ctx = {
 const SignalWSContext = createContext<Ctx | null>(null);
 
 export function SignalWSProvider({
-  url = 'ws://localhost:10000/signal',
+  url = 'ws://${hostname}:10000/signal',
   children,
 }: {
   url?: string;
@@ -46,7 +46,7 @@ export function SignalWSProvider({
   const listenersRef = useRef<Map<string, Set<Listener>>>(new Map());
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://https://cwm.definitelynotaniplogger.com:10000/signal`);
+    const ws = new WebSocket(url.replace('{hostname}', window.location.hostname));
     wsRef.current = ws;
     setStatus('connecting');
 
