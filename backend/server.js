@@ -41,8 +41,18 @@ const PISTON = {
 // ----- Helpers -----
 function sanitizeLang(lang) {
   if (!lang) return null;
-  const l = String(lang).toLowerCase();
-  return ALLOWED_LANGS.has(l) ? l : null;
+  const l = String(lang).trim().toLowerCase();
+  const alias = {
+    js: 'javascript',
+    node: 'javascript',
+    'node.js': 'javascript',
+    nodejs: 'javascript',
+    py: 'python',
+    python3: 'python',
+    py3: 'python',
+  };
+  const mapped = alias[l] || l;
+  return ALLOWED_LANGS.has(mapped) ? mapped : null;
 }
 
 function broadcastRoom(room, obj) {
@@ -127,9 +137,13 @@ function handleLanguageVote(ws, msg) {
     return;
   }
 
-  const proposed = sanitizeLang(msg?.data?.language);
+  const rawLang = msg?.data?.language;
+  const proposed = sanitizeLang(rawLang);
   if (!proposed) {
-    ws.send(JSON.stringify({ type: 'ERROR', message: 'Unsupported language' }));
+    ws.send(JSON.stringify({
+      type: 'LANGUAGE_VOTE_REJECTED',
+      data: { reason: 'UNSUPPORTED_LANGUAGE', requested: rawLang, allowed: Array.from(ALLOWED_LANGS) },
+    }));
     return;
   }
 
@@ -153,6 +167,7 @@ function handleLanguageVote(ws, msg) {
         data: { language: agreedLang, lockMs: LANGUAGE_LOCK_MS },
       });
     }
+    // Optional: else you could clear votes and broadcast a conflict, but not required
   }
 }
 
@@ -199,6 +214,8 @@ async function handleSubmitRequest(ws, msg) {
           reason: !sameLang ? 'LANGUAGE_MISMATCH' : 'HASH_MISMATCH',
         },
       });
+      // Reset the vote round so users don’t get stuck comparing against stale votes
+      room.submitVotes.clear();
       return;
     }
 

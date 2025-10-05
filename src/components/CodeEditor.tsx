@@ -35,13 +35,15 @@ async function sha256Hex(str: string) {
     .join("");
 }
 
+// Client-side guard for languages currently enabled on the server
+const ALLOWED_LANGS = new Set(["javascript", "python"]);
+
 const CodeEditor = () => {
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get("roomId") || "missing-room";
   const navigate = useNavigate();
 
   const editorRef = useRef<{ getValue: () => string } | null>(null);
-  const [value] = useState(""); // harmless if RealTimeMonaco ignores 'value'
   const [isLoaded, setIsLoaded] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const [showMainContent, setShowMainContent] = useState(false);
@@ -80,11 +82,22 @@ const CodeEditor = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Language vote + preview (fixes "r is undefined" false errors)
+  // Language vote + preview
   const onSelect = (lang: keyof typeof CODE_SNIPPETS) => {
-    setPendingLang(lang);
-    setDisplayLanguage(lang); // local preview
-    send({ type: "LANGUAGE_VOTE", data: { language: String(lang) } });
+    const langStr = String(lang);
+    if (!ALLOWED_LANGS.has(langStr)) {
+      toast({
+        status: "info",
+        title: "Language not supported yet",
+        description: "Only JavaScript and Python are enabled right now.",
+      });
+      setPendingLang(null);
+      setDisplayLanguage(agreedLanguage);
+      return;
+    }
+    setPendingLang(langStr);
+    setDisplayLanguage(lang);
+    send({ type: "LANGUAGE_VOTE", data: { language: langStr } });
   };
 
   const onMount = (editor: any) => {
@@ -131,17 +144,42 @@ const CodeEditor = () => {
       const until = m.data?.until
         ? ` (until ${new Date(m.data.until).toLocaleTimeString()})`
         : "";
+      let desc = `Current: ${m.data?.current ?? ""}${until}`;
+      if (m.data?.reason === "UNSUPPORTED_LANGUAGE") {
+        desc =
+          "Only JavaScript and Python are enabled right now." +
+          (Array.isArray(m.data.allowed)
+            ? ` Allowed: ${m.data.allowed.join(", ")}`
+            : "");
+      }
       toast({
         status: "info",
-        title: "Language change locked",
-        description: `Current: ${m.data?.current}${until}`,
+        title:
+          m.data?.reason === "UNSUPPORTED_LANGUAGE"
+            ? "Language not supported"
+            : "Language change locked",
+        description: desc,
       });
+    });
+
+    // Fallback: older server might send ERROR on unsupported language
+    const offError = on("ERROR", (m: any) => {
+      if ((m.message || "").toLowerCase().includes("unsupported language")) {
+        setPendingLang(null);
+        setDisplayLanguage(agreedLanguage);
+        toast({
+          status: "info",
+          title: "Language not supported",
+          description: "Only JavaScript and Python are enabled right now.",
+        });
+      }
     });
 
     return () => {
       offSet();
       offProgress();
       offRejected();
+      offError();
     };
   }, [status, on, send, toast, agreedLanguage]);
 
@@ -362,9 +400,8 @@ const CodeEditor = () => {
                       }}
                       theme="vs-dark"
                       language={displayLanguage} // instant preview fixes false errors
-                      defaultValue={CODE_SNIPPETS[agreedLanguage]} // only pull snippet for agreed language on mount
+                      defaultValue={CODE_SNIPPETS[agreedLanguage] ?? ""} // ensure string
                       onMount={onMount}
-                      value={value}
                       height="75vh"
                       WebsocketURL="ws://localhost:1234/yjs"
                       roomId={roomId}

@@ -9,7 +9,6 @@ import { useRef } from "react";
 import { FunctionComponent } from "react";
 import { EditorProps as MonacoEditorProps } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
-// import "../../styles.css";
 import React from "react";
 export interface UsersType {
   cursor: {
