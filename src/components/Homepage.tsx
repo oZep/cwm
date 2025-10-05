@@ -150,8 +150,6 @@ export default function CallToActionWithIllustration() {
               transition={{ delay: 0.7, duration: 0.5 }}
             >
               <Button
-                as={'a'}
-                href="/editor"
                 rounded={'full'}
                 px={6}
                 colorScheme={'pink'}
@@ -160,6 +158,10 @@ export default function CallToActionWithIllustration() {
                 position="relative"
                 overflow="hidden"
                 transition="all 0.3s"
+                onClick={() => {
+                  const roomId = `room-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+                  window.location.href = `/editor?room=${roomId}`;
+                }}
               >
                 <MotionBox
                   position="absolute"

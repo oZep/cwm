@@ -4,71 +4,56 @@ import http from "http";
 import * as number from "lib0/number";
 import { setupWSConnection } from "./utils.js";
 import { getProblemDetails } from "./question.js";
-import { data } from "react-router-dom";
 
 // Map: { 'room-xyz': Set<ws_A, ws_B> }
-const rooms = new Map()
+const rooms = new Map();
 // Map: { 'client-abc': 'room-xyz' } 
 const clientRooms = new Map(); 
 // Array: Stores clients (their unique ws objects) waiting for a partner.
-// A client waiting in the queue is NOT yet in a room.
 const waitingQueue = []; 
 // Map: Used for connection management and cleanup.
 const connections = new Map();
 let clientIdCounter = 0; 
 
-function processJoinRequest(wsRequester, clientId) { // ws instance, clientId string
-    if (waitingQueue.length > 0) {
-        // partner is waiting: Create a new room and pair them immediately. 
-        const wsPartner = waitingQueue.shift(); 
-        const partnerId = connections.get(wsPartner);
-
-        const roomId = `room-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
-        const newRoom = new Set([wsRequester, wsPartner]);
-        rooms.set(roomId, newRoom);
-        
-        // update client-to-room mappings
-        clientRooms.set(clientId, roomId);
-        clientRooms.set(partnerId, roomId);
-
-        console.log(`Paired ${clientId} and ${partnerId} into new room ${roomId}.`);
-
-        // send "ROOM_READY" message to both clients
-        const roomReadyMessage = JSON.stringify({ 
-            type: 'ROOM_READY', 
-            roomId: roomId, 
-            message: 'Partner found. Request the problem now.' 
-        });
-        
-        wsRequester.send(roomReadyMessage);
-        wsPartner.send(roomReadyMessage);
-
-    } else {
-        // no partner waiting: Place the client in the queue.
-        waitingQueue.push(wsRequester);
-        
-        console.log(`${clientId} placed in waiting queue. Queue size: ${waitingQueue.length}`);
-
-        // send "WAITING" message back to the requester
-        wsRequester.send(JSON.stringify({ 
-            type: 'WAITING', 
-            message: 'Waiting for a partner...' 
-        }));
-    }
+function generateClientId() {
+  return `client-${++clientIdCounter}`;
 }
 
-function processLeaveRequest(wsLeaver, clientId) {
-    const roomId = clientRooms.get(clientId);
-    if (roomId) {
-        const room = rooms.get(roomId);
-        if (room) {
-            room.delete(wsLeaver);
-        }
-    }
+function processJoinRequest(ws, clientId) {
+  if (waitingQueue.length > 0) {
+    const wsPartner = waitingQueue.shift(); 
+    const partnerId = connections.get(wsPartner);
+
+    const roomId = `room-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    const newRoom = new Set([ws, wsPartner]);
+    rooms.set(roomId, newRoom);
+    
+    clientRooms.set(clientId, roomId);
+    clientRooms.set(partnerId, roomId);
+
+    console.log(`Paired ${clientId} and ${partnerId} into new room ${roomId}.`);
+
+    const roomReadyMessage = JSON.stringify({ 
+      type: 'ROOM_READY', 
+      roomId: roomId, 
+      message: 'Partner found. Request the problem now.' 
+    });
+    
+    ws.send(roomReadyMessage);
+    wsPartner.send(roomReadyMessage);
+
+  } else {
+    waitingQueue.push(ws);
+    console.log(`${clientId} placed in waiting queue. Queue size: ${waitingQueue.length}`);
+    ws.send(JSON.stringify({ 
+      type: 'WAITING', 
+      message: 'Waiting for a partner...' 
+    }));
+  }
 }
 
-function handleRequestQuestion(ws, message, messageData) {
+function handleRequestQuestion(ws, messageData) {
   const clientId = connections.get(ws);
   const roomId = clientRooms.get(clientId);
 
@@ -77,18 +62,18 @@ function handleRequestQuestion(ws, message, messageData) {
     return;
   }
 
-  // if the room does not have a question id assigned yet, assign one now
-  if (!rooms.get(roomId).problem) {
-    const { id, language } = message.data || {};
+  const room = rooms.get(roomId);
+  if (!room.problem) {
+    const { id, language } = messageData || {};
     const problem = getProblemDetails(id, language);
-    rooms.get(roomId).problem = problem;
-    response = { type: "QUESTION_DETAILS", success: true, data: problem };
-
-  } else {
-    response = { type: "QUESTION_DETAILS", success: true, data: rooms.get(roomId).problem };
+    room.problem = problem;
   }
 
-  ws.send(JSON.stringify(response));
+  ws.send(JSON.stringify({ 
+    type: "QUESTION_DETAILS", 
+    success: true, 
+    data: room.problem 
+  }));
 }
 
 const wss = new WebSocketServer({ noServer: true });
@@ -100,44 +85,64 @@ const server = http.createServer((_request, response) => {
   response.end("okay");
 });
 
-wss.on("connection", setupWSConnection);
-
-server.on("upgrade", (request, socket, head) => {
-  // You may check auth of request here..
-  // Call `wss.HandleUpgrade` *after* you checked whether the client has access
-  // (e.g. by checking cookies, or url parameters).
-  // See https://github.com/websockets/ws#client-authentication
-  wss.handleUpgrade(
-    request,
-    socket,
-    head,
-    /** @param {any} ws */ (ws) => {
-      wss.emit("connection", ws, request);
+wss.on("connection", (ws, request) => {
+  // Extract room from URL
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const roomId = url.pathname.substring(1) || 'default-room';
+  
+  const clientId = generateClientId();
+  connections.set(ws, clientId);
+  
+  console.log(`New connection: ${clientId} for room ${roomId}`);
+  
+  // Handle messages
+  ws.on("message", (data) => {
+    try {
+      const message = JSON.parse(data);
+      console.log("Received message:", message);
+      
+      if (message.type === "JOIN") {
+        processJoinRequest(ws, clientId);
+      } 
+      else if (message.type === "REQUEST_QUESTION") {
+        handleRequestQuestion(ws, message.data || {});
+      }
+    } catch (error) {
+      console.error("Error handling message:", error);
     }
-  );
+  });
+
+  ws.on("close", () => {
+    console.log(`Connection closed: ${clientId}`);
+    connections.delete(ws);
+    
+    // Clean up from waiting queue
+    const queueIndex = waitingQueue.indexOf(ws);
+    if (queueIndex !== -1) {
+      waitingQueue.splice(queueIndex, 1);
+      console.log(`Removed ${clientId} from waiting queue`);
+    }
+    
+    // Clean up from rooms
+    const roomId = clientRooms.get(clientId);
+    if (roomId) {
+      const room = rooms.get(roomId);
+      if (room) {
+        room.delete(ws);
+        if (room.size === 0) {
+          rooms.delete(roomId);
+          console.log(`Deleted empty room: ${roomId}`);
+        }
+      }
+      clientRooms.delete(clientId);
+    }
+  });
 });
 
-server.on("message", (msg) => {
-  try {
-    // getProblemDetails {"type": "REQUEST_QUESTION", "data": {"id": 1, "language": "javascript"}}'
-    const message = JSON.parse(msg.toString());
-    const clientId = connections.get(server);
-
-    if (message.type === "JOIN") {
-        processJoinRequest(server, clientId); // handles both client waiting and pairing messaging
-    }
-
-    if (message.type === "LEAVE") {
-        processLeaveRequest(server, clientId);
-    }
-
-    if (message.type === "REQUEST_QUESTION") {
-      handleRequestQuestion(server, message, message.data || {});
-    }
-
-  } catch (error) {
-    console.error("Error handling message:", error);
-  }
+server.on("upgrade", (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit("connection", ws, request);
+  });
 });
 
 server.listen(port, host, () => {

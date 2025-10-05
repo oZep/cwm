@@ -5,7 +5,8 @@ import {
   useColorModeValue,
   Fade,
   ScaleFade,
-  SlideFade
+  SlideFade,
+  useToast
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import LanguageSelector from "./LanguageSelector";
@@ -13,33 +14,32 @@ import { CODE_SNIPPETS } from "../constants";
 import Output from "./Output";
 import QuestionBox from "./QuestionBox";
 import { RealTimeMonaco } from "./RealTimeMonaco";
+import { useSearchParams } from 'react-router-dom';
 
 const MotionBox = motion(Box);
 const MotionHStack = motion(HStack);
 
-const requestRandomProblem = (id: number | null, language: string | null, ws: WebSocket) => {
-    const request = {
-        type: "REQUEST_QUESTION",
-        data: {
-            id: id,
-            language: language
-        }
-    };
-    if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(request));
-    } else {
-        console.warn('WebSocket connection is not open.');
-    }
-}
+// Helper to get URL parameters
+const getUrlParam = (name: string): string | null => {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(name);
+};
 
 const CodeEditor = () => {
+  const [searchParams] = useSearchParams();
   const editorRef = useRef<{ getValue: () => string } | null>(null);
   const [value, setValue] = useState("");
   const [language, setLanguage] = useState<keyof typeof CODE_SNIPPETS>("javascript");
   const [isLoaded, setIsLoaded] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const [showMainContent, setShowMainContent] = useState(false);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [status, setStatus] = useState("connecting");
+  const toast = useToast();
 
+  // Get room ID from URL
+  const roomId = searchParams.get('room') || `room-${Date.now()}`;
+  
   // Enhanced color scheme
   const bgGradient = useColorModeValue(
     "linear(to-br, purple.800, purple.900, blue.900)",
@@ -48,12 +48,85 @@ const CodeEditor = () => {
 
   useEffect(() => {
     setIsLoaded(true);
-    // Delay the main content appearance
     const timer = setTimeout(() => {
       setShowMainContent(true);
     }, 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // WebSocket connection effect
+  useEffect(() => {
+    const websocket = new WebSocket(`ws://localhost:1234/${roomId}`);
+    setWs(websocket);
+    setStatus("connecting");
+
+    websocket.onopen = () => {
+      console.log("WebSocket connected");
+      // Send JOIN message
+      websocket.send(JSON.stringify({ type: "JOIN" }));
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log("Received:", message);
+        
+        if (message.type === "WAITING") {
+          setStatus("waiting");
+          toast({
+            title: "Looking for a partner",
+            description: "Please wait while we find you a coding buddy...",
+            status: "info",
+            duration: null,
+            isClosable: true,
+          });
+        } 
+        else if (message.type === "ROOM_READY") {
+          setStatus("ready");
+          toast({
+            title: "Partner found!",
+            description: "You can now start coding together",
+            status: "success",
+            duration: 5000,
+          });
+        }
+        else if (message.type === "QUESTION_DETAILS") {
+          // Handle question details
+          console.log("Question:", message.data);
+        }
+        else if (message.type === "ERROR") {
+          toast({
+            title: "Error",
+            description: message.message,
+            status: "error",
+            duration: 5000,
+          });
+        }
+      } catch (e) {
+        console.error("Error parsing message:", e);
+      }
+    };
+
+    websocket.onclose = () => {
+      console.log("WebSocket disconnected");
+      setStatus("disconnected");
+      toast({
+        title: "Connection lost",
+        description: "Trying to reconnect...",
+        status: "warning",
+        duration: 3000,
+      });
+    };
+
+    websocket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setStatus("error");
+    };
+
+    return () => {
+      websocket.close();
+    };
+  }, [roomId, toast]);
 
   const onSelect = (language: keyof typeof CODE_SNIPPETS) => {
     setLanguage(language);
@@ -64,6 +137,16 @@ const CodeEditor = () => {
     editorRef.current = editor;
     editor.focus();
     setEditorMounted(true);
+  };
+
+  // Request question when ready
+  const requestQuestion = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "REQUEST_QUESTION",
+        data: { language }
+      }));
+    }
   };
 
   return (
@@ -114,7 +197,13 @@ const CodeEditor = () => {
 
       <Box position="relative" zIndex={1}>
         <SlideFade in={isLoaded} offsetY="20px">
-          <QuestionBox question={"What is the capital of France?"} />
+          <QuestionBox 
+            question={status === "waiting" 
+              ? "Looking for your coding partner..." 
+              : status === "ready" 
+                ? "Partner connected! Start coding together" 
+                : "Connecting to session..."} 
+          />
         </SlideFade>
 
         <Fade in={showMainContent}>
@@ -122,7 +211,6 @@ const CodeEditor = () => {
             spacing={4} 
             mx={10} 
             my={1}
-            // --- CHANGE --- Make children stretch to equal height
             align="stretch"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -130,7 +218,6 @@ const CodeEditor = () => {
           >
             {/* Left Column: Editor */}
             <MotionBox 
-              // --- CHANGE --- Use flex={1} for an equal 50% split with the other column
               flex={1}
               whileHover={{ scale: 1.002 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -194,8 +281,8 @@ const CodeEditor = () => {
                       onMount={onMount}
                       value={value}
                       height="75vh"
-                      WebsocketURL="ws://localhost:1234"
-                      roomId="unique-room-id"
+                      WebsocketURL={`ws://localhost:1234/${roomId}`}
+                      roomId={roomId}
                       color="#ff0000"
                       name="YourName"
                     />
@@ -207,14 +294,12 @@ const CodeEditor = () => {
             {/* Right Column: Output */}
             <MotionBox
               flex={1}
-              // --- CHANGE --- Make this box a flex container so its child (Output) can fill its space
               display="flex"
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.6 }}
               whileHover={{ scale: 1.002 }}
             >
-              {/* --- CHANGE --- Ensure the Fade component takes up all available flex space */}
               <ScaleFade 
                 in={isLoaded} 
                 initialScale={0.95} 
