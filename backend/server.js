@@ -58,6 +58,16 @@ function processJoinRequest(wsRequester, clientId) { // ws instance, clientId st
     }
 }
 
+function processLeaveRequest(wsLeaver, clientId) {
+    const roomId = clientRooms.get(clientId);
+    if (roomId) {
+        const room = rooms.get(roomId);
+        if (room) {
+            room.delete(wsLeaver);
+        }
+    }
+}
+
 function handleRequestQuestion(ws, message, messageData) {
   const clientId = connections.get(ws);
   const roomId = clientRooms.get(clientId);
@@ -117,9 +127,14 @@ server.on("message", (msg) => {
         processJoinRequest(server, clientId); // handles both client waiting and pairing messaging
     }
 
+    if (message.type === "LEAVE") {
+        processLeaveRequest(server, clientId);
+    }
+
     if (message.type === "REQUEST_QUESTION") {
       handleRequestQuestion(server, message, message.data || {});
     }
+
   } catch (error) {
     console.error("Error handling message:", error);
   }
